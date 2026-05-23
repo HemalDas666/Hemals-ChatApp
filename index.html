@@ -1,159 +1,253 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title>Hemal's Chat | Personal Chat App</title>
     <link rel="shortcut icon" href="/assets/icons/Icon.png" type="image/x-icon">
     <link rel="stylesheet" href="style.css">
+    <link rel="manifest" href="/manifest.json">
+    <link rel="apple-touch-icon" href="/icons/icon-192.png">
+    <meta name="theme-color" content="#00ffff">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
 </head>
+
 <body>
 
-<div id="authContainer" class="auth-container">
-    <div class="auth-card">
-        <div class="auth-header">
-            <i class="fas fa-comment-dots"></i>
-            <h2>Hemal's Chat</h2>
-            <p>Login or Create Account</p>
-        </div>
-        
-        <div id="loginForm" class="auth-form">
-            <input type="email" id="loginEmail" placeholder="Email Address" class="auth-input">
-            <input type="password" id="loginPassword" placeholder="Password" class="auth-input">
-            <button id="loginBtn" class="auth-btn">Login</button>
-            <p class="auth-switch">Don't have an account? <span id="showSignup">Sign Up</span></p>
-        </div>
-        
-        <div id="signupForm" class="auth-form hidden">
-            <input type="text" id="signupName" placeholder="Full Name" class="auth-input">
-            <input type="email" id="signupEmail" placeholder="Email Address" class="auth-input">
-            <input type="password" id="signupPassword" placeholder="Password" class="auth-input">
-            <button id="signupBtn" class="auth-btn">Sign Up</button>
-            <p class="auth-switch">Already have an account? <span id="showLogin">Login</span></p>
-        </div>
-    </div>
-</div>
-
-<div id="chatContainer" class="chat-container hidden">
-    <nav class="navbar">
-        <div class="nav-container">
-            <div class="logo">
+    <div id="authContainer" class="auth-container">
+        <div class="auth-card">
+            <div class="auth-header">
                 <i class="fas fa-comment-dots"></i>
-                <span>Hemal's Chat Web</span>
+                <h2>Hemal's Chat</h2>
+                <p>Login or Create Account</p>
             </div>
-            <ul class="nav-menu">
-                <li class="nav-item"><a href="#" class="nav-link" id="chatsTab"><i class="fas fa-users"></i><span>Chats</span></a></li>
-                <li class="nav-item"><a href="#" class="nav-link" id="findFriendsTab"><i class="fas fa-user-plus"></i><span>Find Friends</span></a></li>
-                <li class="nav-item"><a href="#" class="nav-link" id="requestsTab"><i class="fas fa-bell"></i><span>Requests</span><span id="requestBadge" class="badge hidden">0</span></a></li>
-                <li class="nav-item dropdown">
-                    <a href="#" class="nav-link dropdown-btn"><i class="fas fa-cog"></i><span>Settings</span><i class="fas fa-chevron-down dropdown-icon"></i></a>
-                    <div class="dropdown-menu">
-                        <a href="#" class="dropdown-item" id="profileSettingsBtn"><i class="fas fa-user-circle"></i> My Profile</a>
-                        <a href="#" class="dropdown-item" id="themeToggleNav"><i class="fas fa-moon"></i> Dark/Light Mode</a>
-                        <a href="#" class="dropdown-item" id="notificationSettingsBtn"><i class="fas fa-bell"></i> Notifications</a>
-                        <div class="dropdown-divider"></div>
-                        <a href="#" class="dropdown-item delete-account-item" id="deleteAccountBtn"><i class="fas fa-trash-alt"></i> Delete Account</a>
-                        <a href="#" class="dropdown-item logout-item" id="logoutNavBtn"><i class="fas fa-sign-out-alt"></i> Logout</a>
-                    </div>
-                </li>
-            </ul>
-            <div class="mobile-menu-btn"><i class="fas fa-bars"></i></div>
-        </div>
-    </nav>
 
-    <div class="main-content">
-        <div class="welcome-section" id="welcomeSection">
-            <i class="fas fa-comments"></i>
-            <h1>Welcome to Hemal's Chat App</h1>
-            <p id="userWelcomeMsg">Find friends and start messaging!</p>
-        </div>
-
-        <div id="chatsPanel" class="panel hidden">
-            <div class="panel-header"><h3><i class="fas fa-users"></i> My Friends</h3></div>
-            <div id="friendsList" class="users-list"><div class="loading-users"><i class="fas fa-spinner fa-spin"></i> Loading...</div></div>
-        </div>
-
-        <div id="findFriendsPanel" class="panel hidden">
-            <div class="panel-header">
-                <h3><i class="fas fa-search"></i> Find Friends</h3>
-                <div class="search-box">
-                    <i class="fas fa-search"></i>
-                    <input type="text" id="searchUserInput" placeholder="Search by name or email..." class="search-input">
-                </div>
+            <div id="loginForm" class="auth-form">
+                <input type="email" id="loginEmail" placeholder="Email Address" class="auth-input">
+                <input type="password" id="loginPassword" placeholder="Password" class="auth-input">
+                <button id="loginBtn" class="auth-btn">Login</button>
+                <p class="auth-switch">Don't have an account? <span id="showSignup">Sign Up</span></p>
             </div>
-            <div id="allUsersList" class="users-list"><div class="loading-users"><i class="fas fa-spinner fa-spin"></i> Loading...</div></div>
-        </div>
 
-        <div id="requestsPanel" class="panel hidden">
-            <div class="panel-header"><h3><i class="fas fa-bell"></i> Friend Requests</h3></div>
-            <div id="requestsList" class="requests-list"><div class="loading-users"><i class="fas fa-spinner fa-spin"></i> Loading...</div></div>
-        </div>
-
-        <div id="profilePanel" class="panel hidden">
-            <div class="panel-header"><h3><i class="fas fa-user-circle"></i> My Profile</h3></div>
-            <div class="profile-container">
-                <div class="profile-avatar">
-                    <div class="avatar-placeholder" id="avatarPlaceholder">H</div>
-                    <button id="changeBioBtn" class="change-bio-btn"><i class="fas fa-edit"></i></button>
-                </div>
-                <div class="profile-info">
-                    <div class="profile-field">
-                        <label>Name</label>
-                        <input type="text" id="profileName" class="profile-input">
-                    </div>
-                    <div class="profile-field">
-                        <label>Email</label>
-                        <input type="email" id="profileEmail" class="profile-input" readonly>
-                    </div>
-                    <div class="profile-field">
-                        <label>Bio / Status</label>
-                        <textarea id="profileBio" class="profile-input" rows="3" placeholder="Tell something about yourself..."></textarea>
-                    </div>
-                    <button id="updateProfileBtn" class="save-profile-btn">Save Changes</button>
-                </div>
-            </div>
-        </div>
-
-        <div id="notificationPanel" class="panel hidden">
-            <div class="panel-header"><h3><i class="fas fa-bell"></i> Notification Settings</h3></div>
-            <div class="notification-settings">
-                <p style="color: #aaa; margin-bottom: 1rem;">Enable notifications to get alerts when you receive new messages.</p>
-                <button id="enableNotificationsBtn" class="auth-btn">Enable Notifications</button>
-            </div>
-        </div>
-
-        <div id="chatArea" class="chat-area hidden">
-            <div class="chat-area-header" id="chatAreaHeader"></div>
-            <div id="messagesArea" class="messages-area"></div>
-            <div class="typing-indicator" id="typingIndicator" style="display: none;">
-                <span><i class="fas fa-pencil-alt"></i> Typing...</span>
-            </div>
-            <div class="message-input-area">
-                <button id="emojiBtn" class="emoji-btn"><i class="far fa-smile"></i></button>
-                <div class="input-group">
-                    <input type="text" id="messageInput" placeholder="Type a message..." class="message-input">
-                    <button id="sendMessageBtn" class="send-message-btn"><i class="fas fa-paper-plane"></i></button>
-                </div>
+            <div id="signupForm" class="auth-form hidden">
+                <input type="text" id="signupName" placeholder="Full Name" class="auth-input">
+                <input type="email" id="signupEmail" placeholder="Email Address" class="auth-input">
+                <input type="password" id="signupPassword" placeholder="Password" class="auth-input">
+                <button id="signupBtn" class="auth-btn">Sign Up</button>
+                <p class="auth-switch">Already have an account? <span id="showLogin">Login</span></p>
             </div>
         </div>
     </div>
 
-    <footer class="footer">
-        <p>&copy; 2026 All Rights Reserved to <span class="hemal-name">Hemal Das</span></p>
-    </footer>
-</div>
+    <div id="chatContainer" class="chat-container hidden">
+        <nav class="navbar">
+            <div class="nav-container">
+                <div class="logo">
+                    <i class="fas fa-comment-dots"></i>
+                    <span>Hemal's Chat Web</span>
+                </div>
+                <ul class="nav-menu">
+                    <li class="nav-item"><a href="#" class="nav-link" id="chatsTab"><i
+                                class="fas fa-users"></i><span>Chats</span></a></li>
+                    <li class="nav-item"><a href="#" class="nav-link" id="findFriendsTab"><i
+                                class="fas fa-user-plus"></i><span>Find Friends</span></a></li>
+                    <li class="nav-item"><a href="#" class="nav-link" id="requestsTab"><i
+                                class="fas fa-bell"></i><span>Requests</span><span id="requestBadge"
+                                class="badge hidden">0</span></a></li>
+                    <li class="nav-item dropdown">
+                        <a href="#" class="nav-link dropdown-btn"><i class="fas fa-cog"></i><span>Settings</span><i
+                                class="fas fa-chevron-down dropdown-icon"></i></a>
+                        <div class="dropdown-menu">
+                            <a href="#" class="dropdown-item" id="profileSettingsBtn"><i class="fas fa-user-circle"></i>
+                                My Profile</a>
+                            <a href="#" class="dropdown-item" id="themeToggleNav"><i class="fas fa-moon"></i> Dark/Light
+                                Mode</a>
+                            <a href="#" class="dropdown-item" id="notificationSettingsBtn"><i class="fas fa-bell"></i>
+                                Notifications</a>
+                            <div class="dropdown-divider"></div>
+                            <a href="#" class="dropdown-item delete-account-item" id="deleteAccountBtn"><i
+                                    class="fas fa-trash-alt"></i> Delete Account</a>
+                            <a href="#" class="dropdown-item logout-item" id="logoutNavBtn"><i
+                                    class="fas fa-sign-out-alt"></i> Logout</a>
+                        </div>
+                    </li>
+                </ul>
+                <div class="mobile-menu-btn"><i class="fas fa-bars"></i></div>
+            </div>
+        </nav>
 
-<div id="emojiPicker" class="emoji-picker hidden">
-    <div class="emoji-list">
-        <span class="emoji">😀</span> <span class="emoji">😎</span> <span class="emoji">🥰</span> <span class="emoji">😂</span>
-        <span class="emoji">❤️</span> <span class="emoji">🔥</span> <span class="emoji">👍</span> <span class="emoji">🎉</span>
-        <span class="emoji">😢</span> <span class="emoji">😡</span> <span class="emoji">🤔</span> <span class="emoji">🙏</span>
-        <span class="emoji">😍</span> <span class="emoji">🥳</span> <span class="emoji">💯</span> <span class="emoji">✨</span>
+        <div class="main-content">
+            <div class="welcome-section" id="welcomeSection">
+                <i class="fas fa-comments"></i>
+                <h1>Welcome to Hemal's Chat App</h1>
+                <p id="userWelcomeMsg">Find friends and start messaging!</p>
+            </div>
+
+            <div id="chatsPanel" class="panel hidden">
+                <div class="panel-header">
+                    <h3><i class="fas fa-users"></i> My Friends</h3>
+                </div>
+                <div id="friendsList" class="users-list">
+                    <div class="loading-users"><i class="fas fa-spinner fa-spin"></i> Loading...</div>
+                </div>
+            </div>
+
+            <div id="findFriendsPanel" class="panel hidden">
+                <div class="panel-header">
+                    <h3><i class="fas fa-search"></i> Find Friends</h3>
+                    <div class="search-box">
+                        <i class="fas fa-search"></i>
+                        <input type="text" id="searchUserInput" placeholder="Search by name or email..."
+                            class="search-input">
+                    </div>
+                </div>
+                <div id="allUsersList" class="users-list">
+                    <div class="loading-users"><i class="fas fa-spinner fa-spin"></i> Loading...</div>
+                </div>
+            </div>
+
+            <div id="requestsPanel" class="panel hidden">
+                <div class="panel-header">
+                    <h3><i class="fas fa-bell"></i> Friend Requests</h3>
+                </div>
+                <div id="requestsList" class="requests-list">
+                    <div class="loading-users"><i class="fas fa-spinner fa-spin"></i> Loading...</div>
+                </div>
+            </div>
+
+            <div id="profilePanel" class="panel hidden">
+                <div class="panel-header">
+                    <h3><i class="fas fa-user-circle"></i> My Profile</h3>
+                </div>
+                <div class="profile-container">
+                    <div class="profile-avatar">
+                        <div class="avatar-placeholder" id="avatarPlaceholder">H</div>
+                        <button id="changeBioBtn" class="change-bio-btn"><i class="fas fa-edit"></i></button>
+                    </div>
+                    <div class="profile-info">
+                        <div class="profile-field">
+                            <label>Name</label>
+                            <input type="text" id="profileName" class="profile-input">
+                        </div>
+                        <div class="profile-field">
+                            <label>Email</label>
+                            <input type="email" id="profileEmail" class="profile-input" readonly>
+                        </div>
+                        <div class="profile-field">
+                            <label>Bio / Status</label>
+                            <textarea id="profileBio" class="profile-input" rows="3"
+                                placeholder="Tell something about yourself..."></textarea>
+                        </div>
+                        <button id="updateProfileBtn" class="save-profile-btn">Save Changes</button>
+                    </div>
+                </div>
+            </div>
+
+            <div id="notificationPanel" class="panel hidden">
+                <div class="panel-header">
+                    <h3><i class="fas fa-bell"></i> Notification Settings</h3>
+                </div>
+                <div class="notification-settings">
+                    <p style="color: #aaa; margin-bottom: 1rem;">Enable notifications to get alerts when you receive new
+                        messages.</p>
+                    <button id="enableNotificationsBtn" class="auth-btn">Enable Notifications</button>
+                </div>
+            </div>
+
+            <div id="chatArea" class="chat-area hidden">
+                <div class="chat-area-header" id="chatAreaHeader"></div>
+                <div id="messagesArea" class="messages-area"></div>
+                <div class="typing-indicator" id="typingIndicator" style="display: none;">
+                    <span><i class="fas fa-pencil-alt"></i> Typing...</span>
+                </div>
+                <div class="message-input-area">
+                    <button id="emojiBtn" class="emoji-btn"><i class="far fa-smile"></i></button>
+                    <div class="input-group">
+                        <input type="text" id="messageInput" placeholder="Type a message..." class="message-input">
+                        <button id="sendMessageBtn" class="send-message-btn"><i class="fas fa-paper-plane"></i></button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <footer class="footer">
+            <p>&copy; 2026 All Rights Reserved to <span class="hemal-name">Hemal Das</span></p>
+        </footer>
     </div>
-</div>
 
-<script type="module" src="firebase-config.js"></script>
-<script type="module" src="script.js"></script>
+    <div id="emojiPicker" class="emoji-picker hidden">
+        <div class="emoji-list">
+            <span class="emoji">😀</span> <span class="emoji">😎</span> <span class="emoji">🥰</span> <span
+                class="emoji">😂</span>
+            <span class="emoji">❤️</span> <span class="emoji">🔥</span> <span class="emoji">👍</span> <span
+                class="emoji">🎉</span>
+            <span class="emoji">😢</span> <span class="emoji">😡</span> <span class="emoji">🤔</span> <span
+                class="emoji">🙏</span>
+            <span class="emoji">😍</span> <span class="emoji">🥳</span> <span class="emoji">💯</span> <span
+                class="emoji">✨</span>
+        </div>
+    </div>
+
+    <script type="module" src="firebase-config.js"></script>
+    <script type="module" src="script.js"></script>
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/sw.js')
+                    .then(registration => {
+                        console.log('Service Worker registered:', registration);
+                    })
+                    .catch(error => {
+                        console.log('Service Worker registration failed:', error);
+                    });
+            });
+        }
+
+        if (typeof window.installPromptHandled === 'undefined') {
+            window.installPromptHandled = true;
+
+            let installDeferredPrompt = null;
+
+            window.addEventListener('beforeinstallprompt', (e) => {
+                e.preventDefault();
+                installDeferredPrompt = e;
+
+                if (!document.getElementById('pwa-install-btn')) {
+                    const installBtn = document.createElement('button');
+                    installBtn.id = 'pwa-install-btn';
+                    installBtn.innerHTML = '📱 Install App';
+                    installBtn.style.position = 'fixed';
+                    installBtn.style.bottom = '20px';
+                    installBtn.style.right = '20px';
+                    installBtn.style.zIndex = '9999';
+                    installBtn.style.background = 'linear-gradient(90deg, #00ffff, #8a2be2)';
+                    installBtn.style.border = 'none';
+                    installBtn.style.padding = '10px 20px';
+                    installBtn.style.borderRadius = '25px';
+                    installBtn.style.color = 'white';
+                    installBtn.style.cursor = 'pointer';
+                    installBtn.style.fontWeight = 'bold';
+                    installBtn.style.boxShadow = '0 4px 15px rgba(0,0,0,0.2)';
+
+                    installBtn.addEventListener('click', () => {
+                        if (installDeferredPrompt) {
+                            installDeferredPrompt.prompt();
+                            installDeferredPrompt.userChoice.then((choiceResult) => {
+                                if (choiceResult.outcome === 'accepted') {
+                                    console.log('User accepted the install prompt');
+                                }
+                                installBtn.remove();
+                                installDeferredPrompt = null;
+                            });
+                        }
+                    });
+
+                    document.body.appendChild(installBtn);
+                }
+            });
+        }
+    </script>
 </body>
+
 </html>
