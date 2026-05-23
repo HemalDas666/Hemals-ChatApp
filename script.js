@@ -799,7 +799,7 @@ async function cleanDuplicateFriends() {
 window.cleanDuplicateFriends = cleanDuplicateFriends;
 
 console.log("========================================");
-console.log("HemalChatApp - Fully Fixed! No duplicate friends on reload");
+console.log("HemalChatApp - The Secure and Personal Chat App");
 console.log("✅ Toast notifications | ✅ Read Status: ✓ → ✓✓ → ●");
 console.log("✅ Search Users | ✅ Delete Account | ✅ Notifications");
 console.log("✅ Typing Indicator | ✅ Online Status | ✅ Edit/Delete Message");
