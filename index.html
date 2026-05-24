@@ -2,10 +2,13 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Hemal's Chat | Personal Chat App</title>
-    <link rel="shortcut icon" href="/assets/icons/Icon.png" type="image/x-icon">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="author" content="Hemal Das">
+    <meta name="theme-color" content="#00ffff">
+    <title>HemalChat | Real Time Chat</title>
     <link rel="stylesheet" href="style.css">
+    <link rel="manifest" href="/manifest.json">
+    <link rel="apple-touch-icon" href="/icons/icon-192.png">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
 </head>
 <body>
@@ -14,7 +17,7 @@
     <div class="auth-card">
         <div class="auth-header">
             <i class="fas fa-comment-dots"></i>
-            <h2>Hemal's Chat</h2>
+            <h2>HemalChat</h2>
             <p>Login or Create Account</p>
         </div>
         
@@ -40,7 +43,7 @@
         <div class="nav-container">
             <div class="logo">
                 <i class="fas fa-comment-dots"></i>
-                <span>Hemal's Chat Web</span>
+                <span>HemalChat</span>
             </div>
             <ul class="nav-menu">
                 <li class="nav-item"><a href="#" class="nav-link" id="chatsTab"><i class="fas fa-users"></i><span>Chats</span></a></li>
@@ -65,7 +68,7 @@
     <div class="main-content">
         <div class="welcome-section" id="welcomeSection">
             <i class="fas fa-comments"></i>
-            <h1>Welcome to Hemal's Chat App</h1>
+            <h1>Welcome to HemalChat</h1>
             <p id="userWelcomeMsg">Find friends and start messaging!</p>
         </div>
 
@@ -155,5 +158,36 @@
 
 <script type="module" src="firebase-config.js"></script>
 <script type="module" src="script.js"></script>
+
+<!-- PWA Install Script -->
+<script>
+if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw.js')
+            .then(reg => console.log('SW registered:', reg))
+            .catch(err => console.log('SW error:', err));
+    });
+}
+
+let installPrompt = null;
+window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    installPrompt = e;
+    
+    if (!document.getElementById('installBtn')) {
+        const btn = document.createElement('button');
+        btn.id = 'installBtn';
+        btn.innerHTML = '📱 Install App';
+        btn.style.cssText = 'position:fixed;bottom:20px;right:20px;z-index:9999;background:linear-gradient(90deg,#00ffff,#8a2be2);border:none;padding:10px 20px;border-radius:25px;color:white;cursor:pointer;font-weight:bold;box-shadow:0 4px 15px rgba(0,0,0,0.2)';
+        btn.onclick = () => {
+            if (installPrompt) {
+                installPrompt.prompt();
+                installPrompt.userChoice.then(() => btn.remove());
+            }
+        };
+        document.body.appendChild(btn);
+    }
+});
+</script>
 </body>
 </html>
