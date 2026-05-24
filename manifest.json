@@ -1,6 +1,6 @@
 {
   "name": "HemalChat",
-  "short_name": "HemalChat",
+  "short_name": "HC",
   "description": "Real Time Chat Application by Hemal Das",
   "start_url": "/",
   "display": "standalone",
@@ -8,13 +8,45 @@
   "background_color": "#0a0a2a",
   "orientation": "portrait",
   "icons": [
-    { "src": "https://ui-avatars.com/api/?background=00ffff&color=fff&bold=true&size=72", "sizes": "72x72", "type": "image/png" },
-    { "src": "https://ui-avatars.com/api/?background=00ffff&color=fff&bold=true&size=96", "sizes": "96x96", "type": "image/png" },
-    { "src": "https://ui-avatars.com/api/?background=00ffff&color=fff&bold=true&size=128", "sizes": "128x128", "type": "image/png" },
-    { "src": "https://ui-avatars.com/api/?background=00ffff&color=fff&bold=true&size=144", "sizes": "144x144", "type": "image/png" },
-    { "src": "https://ui-avatars.com/api/?background=00ffff&color=fff&bold=true&size=152", "sizes": "152x152", "type": "image/png" },
-    { "src": "https://ui-avatars.com/api/?background=00ffff&color=fff&bold=true&size=192", "sizes": "192x192", "type": "image/png" },
-    { "src": "https://ui-avatars.com/api/?background=00ffff&color=fff&bold=true&size=384", "sizes": "384x384", "type": "image/png" },
-    { "src": "https://ui-avatars.com/api/?background=00ffff&color=fff&bold=true&size=512", "sizes": "512x512", "type": "image/png" }
+    {
+      "src": "https://ui-avatars.com/api/?background=00ffff&color=fff&bold=true&size=72&name=HC",
+      "sizes": "72x72",
+      "type": "image/png"
+    },
+    {
+      "src": "https://ui-avatars.com/api/?background=00ffff&color=fff&bold=true&size=96&name=HC",
+      "sizes": "96x96",
+      "type": "image/png"
+    },
+    {
+      "src": "https://ui-avatars.com/api/?background=00ffff&color=fff&bold=true&size=128&name=HC",
+      "sizes": "128x128",
+      "type": "image/png"
+    },
+    {
+      "src": "https://ui-avatars.com/api/?background=00ffff&color=fff&bold=true&size=144&name=HC",
+      "sizes": "144x144",
+      "type": "image/png"
+    },
+    {
+      "src": "https://ui-avatars.com/api/?background=00ffff&color=fff&bold=true&size=152&name=HC",
+      "sizes": "152x152",
+      "type": "image/png"
+    },
+    {
+      "src": "https://ui-avatars.com/api/?background=00ffff&color=fff&bold=true&size=192&name=HC",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "https://ui-avatars.com/api/?background=00ffff&color=fff&bold=true&size=384&name=HC",
+      "sizes": "384x384",
+      "type": "image/png"
+    },
+    {
+      "src": "https://ui-avatars.com/api/?background=00ffff&color=fff&bold=true&size=512&name=HC",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
   ]
 }
