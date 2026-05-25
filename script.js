@@ -80,7 +80,6 @@ const groupSettingsModal = document.getElementById('groupSettingsModal');
 const closeGroupSettingsModal = document.getElementById('closeGroupSettingsModal');
 const editGroupName = document.getElementById('editGroupName');
 const editGroupDescription = document.getElementById('editGroupDescription');
-const editGroupAvatar = document.getElementById('editGroupAvatar');
 const groupMembersManageList = document.getElementById('groupMembersManageList');
 const searchFriendToAdd = document.getElementById('searchFriendToAdd');
 const friendsToAddList = document.getElementById('friendsToAddList');
@@ -400,20 +399,24 @@ async function sendMessage() {
     if (!text) return;
     
     if (currentChatType === 'group' && currentGroup) {
-        await addDoc(collection(db, 'group_chats', currentGroup.id, 'messages'), {
+        const messagesRef = collection(db, 'group_chats', currentGroup.id, 'messages');
+        await addDoc(messagesRef, {
             text: text, senderId: currentUser.uid, senderName: currentUser.displayName || currentUser.email.split('@')[0],
             timestamp: new Date().toISOString()
         });
         messageInput.value = '';
+        messageInput.focus();
     } else if (selectedFriend) {
         const chatId = currentUser.uid < selectedFriend.uid ? currentUser.uid + '_' + selectedFriend.uid : selectedFriend.uid + '_' + currentUser.uid;
-        await addDoc(collection(db, 'chats', chatId, 'messages'), {
+        const messagesRef = collection(db, 'chats', chatId, 'messages');
+        await addDoc(messagesRef, {
             text: text, senderId: currentUser.uid, receiverId: selectedFriend.uid,
-            timestamp: new Date().toISOString(), sent: true, delivered: false, read: false, seen: false
+            timestamp: new Date().toISOString(), sent: true, delivered: false, read: false, seen: false, edited: false, deleted: false
         });
         messageInput.value = '';
+        messageInput.focus();
     } else {
-        showToast('No Chat Selected', 'Select a friend or group to chat with', 'warning');
+        showToast('No Chat Selected', 'Please select a friend or group to chat with', 'warning');
     }
 }
 
@@ -425,6 +428,8 @@ async function openChat(friend) {
     currentChatId = currentUser.uid < friend.uid ? currentUser.uid + '_' + friend.uid : friend.uid + '_' + currentUser.uid;
     
     if (membersUnsubscribe) membersUnsubscribe();
+    const existingSidebar = document.querySelector('.group-members-sidebar');
+    if (existingSidebar) existingSidebar.remove();
     
     chatArea.classList.remove('hidden');
     welcomeSection.classList.add('hidden');
@@ -452,9 +457,9 @@ async function openChat(friend) {
             let time = msg.timestamp ? new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
             let status = '';
             if (isOwn) {
-                if (msg.seen) status = '<span style="color:#000;">●</span>';
-                else if (msg.delivered) status = '<span style="color:#00ffff;">✓✓</span>';
-                else if (msg.sent) status = '<span style="color:#aaa;">✓</span>';
+                if (msg.seen) status = '<span class="read-status" style="color: #000;">●</span>';
+                else if (msg.delivered) status = '<span class="read-status" style="color: #00ffff;">✓✓</span>';
+                else if (msg.sent) status = '<span class="read-status" style="color: #aaa;">✓</span>';
             }
             div.innerHTML = `<div class="message-bubble"><div class="message-text">${escapeHtml(msg.text)}</div><div class="message-time">${time} ${status}</div></div>`;
             messagesArea.appendChild(div);
@@ -491,7 +496,7 @@ async function openGroupChat(group) {
                 </div>
             </div>
             <div class="group-actions">
-                <button id="groupSettingsBtn" class="group-action-btn" title="Group Settings" style="background:none;border:none;color:#00ffff;cursor:pointer;padding:5px;"><i class="fas fa-cog"></i> Settings</button>
+                <button id="groupSettingsBtn" class="group-action-btn" title="Group Settings" style="background:none;border:none;color:#00ffff;cursor:pointer;padding:5px 10px;border-radius:8px;"><i class="fas fa-cog"></i> Settings</button>
             </div>
         </div>
     `;
@@ -500,6 +505,44 @@ async function openGroupChat(group) {
     
     if (messagesUnsubscribe) messagesUnsubscribe();
     if (membersUnsubscribe) membersUnsubscribe();
+    
+    // Load members as chips below header (inline, not blocking screen)
+    const loadMembersInline = async () => {
+        const members = group.members || [];
+        let membersHtml = '<div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:12px;padding:8px 0;border-top:1px solid rgba(0,255,255,0.2);">';
+        membersHtml += '<span style="color:#00ffff;font-size:0.7rem;margin-right:8px;"><i class="fas fa-users"></i> Members:</span>';
+        for (const memberId of members) {
+            const userDoc = await getDoc(doc(db, 'users', memberId));
+            if (userDoc.exists()) {
+                const member = userDoc.data();
+                const isOnline = member.online || false;
+                const isAdminUser = group.admins?.includes(memberId);
+                const isCreator = group.createdBy === memberId;
+                membersHtml += `
+                    <div style="display:inline-flex;align-items:center;gap:5px;background:rgba(0,255,255,0.1);padding:4px 10px;border-radius:20px;">
+                        <span style="width:8px;height:8px;border-radius:50%;background:${isOnline ? '#00ff88' : '#666'};"></span>
+                        <span style="font-size:0.7rem;color:white;">${escapeHtml(member.name)}</span>
+                        ${isCreator ? '<span style="font-size:0.6rem;color:#ffaa00;">👑</span>' : (isAdminUser ? '<span style="font-size:0.6rem;color:#00ffff;">👑</span>' : '')}
+                        ${memberId === currentUser.uid ? '<span style="font-size:0.6rem;color:#00ffff;">(You)</span>' : ''}
+                    </div>
+                `;
+            }
+        }
+        membersHtml += '</div>';
+        const existingContainer = document.getElementById('groupMembersInline');
+        if (existingContainer) {
+            existingContainer.innerHTML = membersHtml;
+        } else {
+            const membersContainer = document.createElement('div');
+            membersContainer.id = 'groupMembersInline';
+            chatAreaHeader.appendChild(membersContainer);
+            membersContainer.innerHTML = membersHtml;
+        }
+    };
+    
+    await loadMembersInline();
+    const interval = setInterval(loadMembersInline, 5000);
+    membersUnsubscribe = () => clearInterval(interval);
     
     const messagesRef = collection(db, 'group_chats', group.id, 'messages');
     const q = query(messagesRef, orderBy('timestamp', 'asc'));
@@ -520,41 +563,6 @@ async function openGroupChat(group) {
         });
         messagesArea.scrollTop = messagesArea.scrollHeight;
     });
-    
-    // Load members - display inline below header, not as separate sidebar
-    const loadMembersInline = async () => {
-        const members = group.members || [];
-        let membersHtml = '<div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:10px;padding:8px;background:rgba(0,0,0,0.2);border-radius:10px;">';
-        for (const memberId of members) {
-            const userDoc = await getDoc(doc(db, 'users', memberId));
-            if (userDoc.exists()) {
-                const member = userDoc.data();
-                const isOnline = member.online || false;
-                const isAdminUser = group.admins?.includes(memberId);
-                const isCreator = group.createdBy === memberId;
-                membersHtml += `
-                    <div style="display:inline-flex;align-items:center;gap:5px;background:rgba(0,255,255,0.1);padding:4px 10px;border-radius:20px;">
-                        <span style="width:8px;height:8px;border-radius:50%;background:${isOnline ? '#00ff88' : '#666'};"></span>
-                        <span style="font-size:0.75rem;color:white;">${escapeHtml(member.name)}</span>
-                        ${isCreator ? '<span style="font-size:0.6rem;color:#ffaa00;">👑</span>' : (isAdminUser ? '<span style="font-size:0.6rem;color:#00ffff;">👑</span>' : '')}
-                        ${memberId === currentUser.uid ? '<span style="font-size:0.6rem;color:#00ffff;">(You)</span>' : ''}
-                    </div>
-                `;
-            }
-        }
-        membersHtml += '</div>';
-        if (!document.getElementById('groupMembersInline')) {
-            const membersContainer = document.createElement('div');
-            membersContainer.id = 'groupMembersInline';
-            chatAreaHeader.appendChild(membersContainer);
-        }
-        const membersContainer = document.getElementById('groupMembersInline');
-        if (membersContainer) membersContainer.innerHTML = membersHtml;
-    };
-    
-    await loadMembersInline();
-    const interval = setInterval(loadMembersInline, 5000);
-    membersUnsubscribe = () => clearInterval(interval);
 }
 
 function closeChat() {
@@ -572,7 +580,7 @@ function closeChat() {
 
 async function loadGroupsList() {
     if (!currentUser) return;
-    groupsListDiv.innerHTML = '<div class="loading-users">Loading groups...</div>';
+    groupsListDiv.innerHTML = '<div class="loading-users"><i class="fas fa-spinner fa-spin"></i> Loading groups...</div>';
     const q = query(collection(db, 'groups'), where('members', 'array-contains', currentUser.uid));
     const snapshot = await getDocs(q);
     if (snapshot.empty) { groupsListDiv.innerHTML = '<div class="loading-users">No groups yet. Create one!</div>'; return; }
@@ -584,11 +592,11 @@ async function loadGroupsList() {
         div.style.cursor = 'pointer';
         const isAdmin = group.admins?.includes(currentUser.uid);
         div.innerHTML = `
-            <div class="group-avatar">${group.name.charAt(0).toUpperCase()}</div>
-            <div class="group-info">
-                <div class="group-name">${escapeHtml(group.name)} ${isAdmin ? '<span style="font-size:0.7rem;color:#00ffff;">👑 Admin</span>' : ''}</div>
-                <div class="group-description">${escapeHtml(group.description || 'No description')}</div>
-                <div class="group-member-count"><i class="fas fa-users"></i> ${group.members?.length || 0} members</div>
+            <div class="group-avatar" style="width:50px;height:50px;border-radius:12px;background:linear-gradient(135deg,#00ffff,#8a2be2);display:flex;align-items:center;justify-content:center;font-weight:bold;font-size:1.2rem;color:white;">${group.name.charAt(0).toUpperCase()}</div>
+            <div class="group-info" style="flex:1;margin-left:12px;">
+                <div class="group-name" style="font-weight:600;color:white;">${escapeHtml(group.name)} ${isAdmin ? '<span style="font-size:0.65rem;color:#00ffff;">👑 Admin</span>' : ''}</div>
+                <div class="group-description" style="font-size:0.7rem;color:#aaa;">${escapeHtml(group.description || 'No description')}</div>
+                <div class="group-member-count" style="font-size:0.7rem;color:#888;margin-top:2px;"><i class="fas fa-users"></i> ${group.members?.length || 0} members</div>
             </div>
             <i class="fas fa-chevron-right" style="color:#00ffff;"></i>
         `;
@@ -660,7 +668,6 @@ async function openGroupSettings(group) {
     currentGroupForSettings = group;
     editGroupName.value = group.name || '';
     editGroupDescription.value = group.description || '';
-    editGroupAvatar.value = group.avatar || '';
     
     const members = group.members || [];
     groupMembersManageList.innerHTML = '<div class="loading-users">Loading members...</div>';
@@ -737,8 +744,7 @@ saveGroupSettingsBtn?.addEventListener('click', async () => {
     if (!newName) { showToast('Error', 'Group name required', 'error'); return; }
     await updateDoc(doc(db, 'groups', currentGroupForSettings.id), {
         name: newName,
-        description: editGroupDescription.value.trim() || '',
-        avatar: editGroupAvatar.value.trim() || ''
+        description: editGroupDescription.value.trim() || ''
     });
     const selectedCheckboxes = friendsToAddList.querySelectorAll('.add-friend-checkbox:checked');
     const newMembers = [];
@@ -911,7 +917,7 @@ if (themeToggleNav) {
 
 console.log("========================================");
 console.log("HemalChatApp - Complete Group Chat System");
-console.log("✅ Group Chat | ✅ Member List | ✅ Online/Offline Status");
+console.log("✅ Group Chat | ✅ Member List Inline | ✅ Online/Offline Status");
 console.log("✅ Group Settings | ✅ Private Chat | ✅ Friend System");
 console.log("Created by Hemal Das");
 console.log("========================================");
