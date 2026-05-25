@@ -5,10 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
     <meta name="author" content="Hemal Das">
     <meta name="theme-color" content="#00ffff">
-    <title>Hemal's Chat | Personal Chat App</title>
+    <title>HemalChat | Ultimate Group Chat</title>
     <link rel="stylesheet" href="style.css">
     <link rel="manifest" href="/manifest.json">
-    <link rel="apple-touch-icon" href="/assets/icons/Icon.png">
+    <link rel="apple-touch-icon" href="/icons/icon-192.png">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
 </head>
 <body>
@@ -20,14 +20,12 @@
             <h2>HemalChat</h2>
             <p>Login or Create Account</p>
         </div>
-        
         <div id="loginForm" class="auth-form">
             <input type="email" id="loginEmail" placeholder="Email Address" class="auth-input">
             <input type="password" id="loginPassword" placeholder="Password" class="auth-input">
             <button id="loginBtn" class="auth-btn">Login</button>
             <p class="auth-switch">Don't have an account? <span id="showSignup">Sign Up</span></p>
         </div>
-        
         <div id="signupForm" class="auth-form hidden">
             <input type="text" id="signupName" placeholder="Full Name" class="auth-input">
             <input type="email" id="signupEmail" placeholder="Email Address" class="auth-input">
@@ -42,13 +40,14 @@
     <nav class="navbar">
         <div class="nav-container">
             <div class="logo">
-                <i class="fas fa-comment-dots"></i>
+                <div class="logo-icon">HC</div>
                 <span>HemalChat</span>
             </div>
             <ul class="nav-menu">
                 <li class="nav-item"><a href="#" class="nav-link" id="chatsTab"><i class="fas fa-users"></i><span>Chats</span></a></li>
                 <li class="nav-item"><a href="#" class="nav-link" id="findFriendsTab"><i class="fas fa-user-plus"></i><span>Find Friends</span></a></li>
                 <li class="nav-item"><a href="#" class="nav-link" id="requestsTab"><i class="fas fa-bell"></i><span>Requests</span><span id="requestBadge" class="badge hidden">0</span></a></li>
+                <li class="nav-item"><a href="#" class="nav-link" id="groupsTab"><i class="fas fa-layer-group"></i><span>Groups</span></a></li>
                 <li class="nav-item dropdown">
                     <a href="#" class="nav-link dropdown-btn"><i class="fas fa-cog"></i><span>Settings</span><i class="fas fa-chevron-down dropdown-icon"></i></a>
                     <div class="dropdown-menu">
@@ -69,14 +68,16 @@
         <div class="welcome-section" id="welcomeSection">
             <i class="fas fa-comments"></i>
             <h1>Welcome to HemalChat</h1>
-            <p id="userWelcomeMsg">Find friends and start messaging!</p>
+            <p id="userWelcomeMsg">Find friends, create groups, and start chatting!</p>
         </div>
 
+        <!-- Friends Panel -->
         <div id="chatsPanel" class="panel hidden">
             <div class="panel-header"><h3><i class="fas fa-users"></i> My Friends</h3></div>
             <div id="friendsList" class="users-list"><div class="loading-users"><i class="fas fa-spinner fa-spin"></i> Loading...</div></div>
         </div>
 
+        <!-- Find Friends Panel -->
         <div id="findFriendsPanel" class="panel hidden">
             <div class="panel-header">
                 <h3><i class="fas fa-search"></i> Find Friends</h3>
@@ -88,11 +89,22 @@
             <div id="allUsersList" class="users-list"><div class="loading-users"><i class="fas fa-spinner fa-spin"></i> Loading...</div></div>
         </div>
 
+        <!-- Requests Panel -->
         <div id="requestsPanel" class="panel hidden">
             <div class="panel-header"><h3><i class="fas fa-bell"></i> Friend Requests</h3></div>
             <div id="requestsList" class="requests-list"><div class="loading-users"><i class="fas fa-spinner fa-spin"></i> Loading...</div></div>
         </div>
 
+        <!-- Groups Panel -->
+        <div id="groupsPanel" class="panel hidden">
+            <div class="panel-header">
+                <h3><i class="fas fa-layer-group"></i> My Groups</h3>
+                <button id="createGroupBtn" class="create-group-btn"><i class="fas fa-plus"></i> Create New Group</button>
+            </div>
+            <div id="groupsList" class="groups-list"><div class="loading-users"><i class="fas fa-spinner fa-spin"></i> Loading groups...</div></div>
+        </div>
+
+        <!-- Profile Panel -->
         <div id="profilePanel" class="panel hidden">
             <div class="panel-header"><h3><i class="fas fa-user-circle"></i> My Profile</h3></div>
             <div class="profile-container">
@@ -101,37 +113,25 @@
                     <button id="changeBioBtn" class="change-bio-btn"><i class="fas fa-edit"></i></button>
                 </div>
                 <div class="profile-info">
-                    <div class="profile-field">
-                        <label>Name</label>
-                        <input type="text" id="profileName" class="profile-input">
-                    </div>
-                    <div class="profile-field">
-                        <label>Email</label>
-                        <input type="email" id="profileEmail" class="profile-input" readonly>
-                    </div>
-                    <div class="profile-field">
-                        <label>Bio / Status</label>
-                        <textarea id="profileBio" class="profile-input" rows="3" placeholder="Tell something about yourself..."></textarea>
-                    </div>
+                    <div class="profile-field"><label>Name</label><input type="text" id="profileName" class="profile-input"></div>
+                    <div class="profile-field"><label>Email</label><input type="email" id="profileEmail" class="profile-input" readonly></div>
+                    <div class="profile-field"><label>Bio / Status</label><textarea id="profileBio" class="profile-input" rows="3" placeholder="Tell something about yourself..."></textarea></div>
                     <button id="updateProfileBtn" class="save-profile-btn">Save Changes</button>
                 </div>
             </div>
         </div>
 
+        <!-- Notification Panel -->
         <div id="notificationPanel" class="panel hidden">
             <div class="panel-header"><h3><i class="fas fa-bell"></i> Notification Settings</h3></div>
-            <div class="notification-settings">
-                <p style="color: #aaa; margin-bottom: 1rem;">Enable notifications to get alerts when you receive new messages.</p>
-                <button id="enableNotificationsBtn" class="auth-btn">Enable Notifications</button>
-            </div>
+            <div class="notification-settings"><p>Enable notifications to get alerts when you receive new messages.</p><button id="enableNotificationsBtn" class="auth-btn">Enable Notifications</button></div>
         </div>
 
+        <!-- Chat Area -->
         <div id="chatArea" class="chat-area hidden">
             <div class="chat-area-header" id="chatAreaHeader"></div>
             <div id="messagesArea" class="messages-area"></div>
-            <div class="typing-indicator" id="typingIndicator" style="display: none;">
-                <span><i class="fas fa-pencil-alt"></i> Typing...</span>
-            </div>
+            <div class="typing-indicator" id="typingIndicator" style="display: none;"><span><i class="fas fa-pencil-alt"></i> Typing...</span></div>
             <div class="message-input-area">
                 <button id="emojiBtn" class="emoji-btn"><i class="far fa-smile"></i></button>
                 <div class="input-group">
@@ -142,24 +142,66 @@
         </div>
     </div>
 
-    <footer class="footer">
-        <p>&copy; 2026 All Rights Reserved to <span class="hemal-name">Hemal Das</span></p>
-    </footer>
+    <footer class="footer"><p>&copy; 2026 All Rights Reserved to <span class="hemal-name">Hemal Das</span></p></footer>
+</div>
+
+<!-- Create Group Modal -->
+<div id="createGroupModal" class="modal hidden">
+    <div class="modal-content">
+        <span class="close-modal" id="closeCreateModal">&times;</span>
+        <h3><i class="fas fa-layer-group"></i> Create New Group</h3>
+        <input type="text" id="groupNameInput" placeholder="Group Name" class="auth-input">
+        <input type="text" id="groupDescriptionInput" placeholder="Group Description (optional)" class="auth-input">
+        <input type="text" id="groupAvatarInput" placeholder="Group Avatar URL (optional)" class="auth-input">
+        <h4>Select Members</h4>
+        <div id="groupMembersList" class="group-members-list"></div>
+        <button id="confirmCreateGroupBtn" class="auth-btn">Create Group</button>
+    </div>
+</div>
+
+<!-- Group Settings Modal -->
+<div id="groupSettingsModal" class="modal hidden">
+    <div class="modal-content">
+        <span class="close-modal" id="closeGroupSettingsModal">&times;</span>
+        <h3><i class="fas fa-cog"></i> Group Settings</h3>
+        <input type="text" id="editGroupName" placeholder="Group Name" class="auth-input">
+        <input type="text" id="editGroupDescription" placeholder="Group Description" class="auth-input">
+        <input type="text" id="editGroupAvatar" placeholder="Group Avatar URL" class="auth-input">
+        <h4>Members</h4>
+        <div id="groupMembersManageList" class="group-members-list"></div>
+        <h4>Add New Member</h4>
+        <div class="search-box"><i class="fas fa-search"></i><input type="text" id="searchFriendToAdd" placeholder="Search friends..." class="search-input"></div>
+        <div id="friendsToAddList" class="group-members-list"></div>
+        <div style="display: flex; gap: 10px; margin-top: 15px;">
+            <button id="saveGroupSettingsBtn" class="auth-btn">Save Changes</button>
+            <button id="deleteGroupBtn" class="auth-btn" style="background: linear-gradient(90deg, #ff4444, #cc0000);">Delete Group</button>
+        </div>
+    </div>
+</div>
+
+<!-- Add Member Modal -->
+<div id="addMemberModal" class="modal hidden">
+    <div class="modal-content">
+        <span class="close-modal" id="closeAddModal">&times;</span>
+        <h3><i class="fas fa-user-plus"></i> Add Members</h3>
+        <div class="search-box"><i class="fas fa-search"></i><input type="text" id="searchMemberInput" placeholder="Search friends..." class="search-input"></div>
+        <div id="availableFriendsList" class="group-members-list"></div>
+        <button id="confirmAddMemberBtn" class="auth-btn">Add Selected</button>
+    </div>
 </div>
 
 <div id="emojiPicker" class="emoji-picker hidden">
     <div class="emoji-list">
-        <span class="emoji">😀</span> <span class="emoji">😎</span> <span class="emoji">🥰</span> <span class="emoji">😂</span>
-        <span class="emoji">❤️</span> <span class="emoji">🔥</span> <span class="emoji">👍</span> <span class="emoji">🎉</span>
-        <span class="emoji">😢</span> <span class="emoji">😡</span> <span class="emoji">🤔</span> <span class="emoji">🙏</span>
-        <span class="emoji">😍</span> <span class="emoji">🥳</span> <span class="emoji">💯</span> <span class="emoji">✨</span>
+        <span class="emoji">😀</span><span class="emoji">😎</span><span class="emoji">🥰</span><span class="emoji">😂</span>
+        <span class="emoji">❤️</span><span class="emoji">🔥</span><span class="emoji">👍</span><span class="emoji">🎉</span>
+        <span class="emoji">😢</span><span class="emoji">😡</span><span class="emoji">🤔</span><span class="emoji">🙏</span>
+        <span class="emoji">😍</span><span class="emoji">🥳</span><span class="emoji">💯</span><span class="emoji">✨</span>
     </div>
 </div>
 
 <script type="module" src="firebase-config.js"></script>
 <script type="module" src="script.js"></script>
 
-<!-- PWA Install Script -->
 <script>
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
@@ -168,21 +210,22 @@ if ('serviceWorker' in navigator) {
             .catch(err => console.log('SW error:', err));
     });
 }
-
 let installPrompt = null;
 window.addEventListener('beforeinstallprompt', (e) => {
     e.preventDefault();
     installPrompt = e;
-    
     if (!document.getElementById('installBtn')) {
         const btn = document.createElement('button');
         btn.id = 'installBtn';
         btn.innerHTML = '📱 Install App';
-        btn.style.cssText = 'position:fixed;bottom:20px;right:20px;z-index:9999;background:linear-gradient(90deg,#00ffff,#8a2be2);border:none;padding:10px 20px;border-radius:25px;color:white;cursor:pointer;font-weight:bold;box-shadow:0 4px 15px rgba(0,0,0,0.2)';
-        btn.onclick = () => {
+        btn.style.cssText = 'position:fixed;bottom:20px;right:20px;z-index:9999;background:linear-gradient(90deg,#00ffff,#8a2be2);border:none;padding:12px 24px;border-radius:30px;color:white;cursor:pointer;font-weight:bold;box-shadow:0 4px 15px rgba(0,0,0,0.3);font-size:16px;';
+        btn.onclick = async () => {
             if (installPrompt) {
                 installPrompt.prompt();
-                installPrompt.userChoice.then(() => btn.remove());
+                const { outcome } = await installPrompt.userChoice;
+                console.log(`User response: ${outcome}`);
+                installPrompt = null;
+                btn.remove();
             }
         };
         document.body.appendChild(btn);

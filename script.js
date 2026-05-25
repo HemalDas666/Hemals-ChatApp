@@ -5,13 +5,16 @@ import {
 } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-auth.js";
 import {
     collection, query, where, getDocs, addDoc, orderBy, onSnapshot, 
-    doc, updateDoc, getDoc, setDoc, deleteDoc
+    doc, updateDoc, getDoc, setDoc, deleteDoc, arrayUnion, arrayRemove
 } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-firestore.js";
 
 let currentUser = null;
 let selectedFriend = null;
+let currentGroup = null;
 let currentChatId = null;
+let currentChatType = null;
 let messagesUnsubscribe = null;
+let membersUnsubscribe = null;
 let typingTimeout = null;
 let notificationPermission = false;
 let searchTimeout = null;
@@ -23,12 +26,14 @@ const welcomeSection = document.getElementById('welcomeSection');
 const chatsPanel = document.getElementById('chatsPanel');
 const findFriendsPanel = document.getElementById('findFriendsPanel');
 const requestsPanel = document.getElementById('requestsPanel');
+const groupsPanel = document.getElementById('groupsPanel');
 const profilePanel = document.getElementById('profilePanel');
 const notificationPanel = document.getElementById('notificationPanel');
 const chatArea = document.getElementById('chatArea');
 const friendsListDiv = document.getElementById('friendsList');
 const allUsersListDiv = document.getElementById('allUsersList');
 const requestsListDiv = document.getElementById('requestsList');
+const groupsListDiv = document.getElementById('groupsList');
 const messagesArea = document.getElementById('messagesArea');
 const messageInput = document.getElementById('messageInput');
 const sendBtn = document.getElementById('sendMessageBtn');
@@ -42,6 +47,7 @@ const searchUserInput = document.getElementById('searchUserInput');
 const chatsTab = document.getElementById('chatsTab');
 const findFriendsTab = document.getElementById('findFriendsTab');
 const requestsTab = document.getElementById('requestsTab');
+const groupsTab = document.getElementById('groupsTab');
 const profileSettingsBtn = document.getElementById('profileSettingsBtn');
 const notificationSettingsBtn = document.getElementById('notificationSettingsBtn');
 const deleteAccountBtn = document.getElementById('deleteAccountBtn');
@@ -62,6 +68,29 @@ const profileBio = document.getElementById('profileBio');
 const updateProfileBtn = document.getElementById('updateProfileBtn');
 const changeBioBtn = document.getElementById('changeBioBtn');
 
+const createGroupBtn = document.getElementById('createGroupBtn');
+const createGroupModal = document.getElementById('createGroupModal');
+const closeCreateModal = document.getElementById('closeCreateModal');
+const groupNameInput = document.getElementById('groupNameInput');
+const groupDescriptionInput = document.getElementById('groupDescriptionInput');
+const groupMembersList = document.getElementById('groupMembersList');
+const confirmCreateGroupBtn = document.getElementById('confirmCreateGroupBtn');
+
+const groupSettingsModal = document.getElementById('groupSettingsModal');
+const closeGroupSettingsModal = document.getElementById('closeGroupSettingsModal');
+const editGroupName = document.getElementById('editGroupName');
+const editGroupDescription = document.getElementById('editGroupDescription');
+const editGroupAvatar = document.getElementById('editGroupAvatar');
+const groupMembersManageList = document.getElementById('groupMembersManageList');
+const searchFriendToAdd = document.getElementById('searchFriendToAdd');
+const friendsToAddList = document.getElementById('friendsToAddList');
+const saveGroupSettingsBtn = document.getElementById('saveGroupSettingsBtn');
+const deleteGroupBtn = document.getElementById('deleteGroupBtn');
+
+let selectedMembersForGroup = new Set();
+let currentGroupForSettings = null;
+let allFriendsList = [];
+
 function showToast(title, message, type = 'info') {
     let toastContainer = document.querySelector('.toast-container');
     if (!toastContainer) {
@@ -69,25 +98,12 @@ function showToast(title, message, type = 'info') {
         toastContainer.className = 'toast-container';
         document.body.appendChild(toastContainer);
     }
-    
     const icons = { success: '✅', error: '❌', warning: '⚠️', info: 'ℹ️' };
-    
     const toast = document.createElement('div');
     toast.className = `toast ${type}`;
-    toast.innerHTML = `
-        <div class="toast-icon">${icons[type] || 'ℹ️'}</div>
-        <div class="toast-content">
-            <div class="toast-title">${title}</div>
-            <div class="toast-message">${message}</div>
-        </div>
-        <div class="toast-close">&times;</div>
-    `;
-    
+    toast.innerHTML = `<div class="toast-icon">${icons[type] || 'ℹ️'}</div><div class="toast-content"><div class="toast-title">${title}</div><div class="toast-message">${message}</div></div><div class="toast-close">&times;</div>`;
     toastContainer.appendChild(toast);
-    
-    const closeBtn = toast.querySelector('.toast-close');
-    closeBtn.addEventListener('click', () => removeToast(toast));
-    
+    toast.querySelector('.toast-close').addEventListener('click', () => removeToast(toast));
     setTimeout(() => removeToast(toast), 5000);
     toast.addEventListener('click', () => removeToast(toast));
 }
@@ -134,20 +150,14 @@ signupBtn?.addEventListener('click', async () => {
         showToast('Password Error', 'Password must be at least 6 characters', 'warning');
         return;
     }
-    
     try {
         const userCredential = await createUserWithEmailAndPassword(auth, email, password);
         await updateProfile(userCredential.user, { displayName: name });
         await setDoc(doc(db, 'users', userCredential.user.uid), {
-            name: name,
-            email: email,
-            uid: userCredential.user.uid,
-            bio: '',
-            online: true,
-            lastSeen: new Date().toISOString(),
-            createdAt: new Date().toISOString()
+            name: name, email: email, uid: userCredential.user.uid, bio: '', online: true,
+            lastSeen: new Date().toISOString(), createdAt: new Date().toISOString()
         });
-        showToast('Welcome to HemalChat!', 'Account created successfully! Please login.', 'success');
+        showToast('Success!', 'Account created! Please login.', 'success');
         signupForm.classList.add('hidden');
         loginForm.classList.remove('hidden');
         document.getElementById('signupName').value = '';
@@ -169,321 +179,145 @@ logoutNavBtn?.addEventListener('click', async () => {
 
 async function updateUserStatus(isOnline) {
     if (!currentUser) return;
-    await updateDoc(doc(db, 'users', currentUser.uid), {
-        online: isOnline,
-        lastSeen: new Date().toISOString()
-    });
+    await updateDoc(doc(db, 'users', currentUser.uid), { online: isOnline, lastSeen: new Date().toISOString() });
 }
 
-window.addEventListener('beforeunload', () => {
-    if (currentUser) {
-        updateUserStatus(false);
-    }
-});
+window.addEventListener('beforeunload', () => { if (currentUser) updateUserStatus(false); });
 
-async function requestNotificationPermission() {
-    if (!("Notification" in window)) {
-        showToast('Not Supported', 'This browser does not support notifications', 'warning');
-        return false;
-    }
-    
+enableNotificationsBtn?.addEventListener('click', async () => {
+    if (!("Notification" in window)) return showToast('Not Supported', 'Browser does not support notifications', 'warning');
     const permission = await Notification.requestPermission();
     if (permission === "granted") {
         notificationPermission = true;
-        showToast('Notifications Enabled', 'You will receive alerts for new messages', 'success');
-        return true;
+        showToast('Enabled', 'Notifications enabled!', 'success');
     } else {
-        showToast('Permission Denied', 'Notification permission denied', 'error');
-        return false;
+        showToast('Denied', 'Notification permission denied', 'error');
     }
-}
+});
 
 function showNotification(title, body) {
-    if (!notificationPermission) return;
-    if (document.hasFocus()) return;
-    
-    const options = {
-        body: body,
-        icon: "https://ui-avatars.com/api/?background=00ffff&color=fff&bold=true",
-        silent: false,
-        vibrate: [200, 100, 200]
-    };
-    
-    const notification = new Notification(title, options);
-    notification.onclick = () => {
-        window.focus();
-        notification.close();
-    };
+    if (!notificationPermission || document.hasFocus()) return;
+    const notification = new Notification(title, { body: body, icon: "https://ui-avatars.com/api/?background=00ffff&color=fff&bold=true", silent: false, vibrate: [200, 100, 200] });
+    notification.onclick = () => { window.focus(); notification.close(); };
     setTimeout(() => notification.close(), 5000);
 }
-
-enableNotificationsBtn?.addEventListener('click', requestNotificationPermission);
 
 function filterUsers(searchTerm) {
     if (!allUsersCache.length) return;
     const term = searchTerm.toLowerCase().trim();
-    if (!term) {
-        displayUsersList(allUsersCache);
-        return;
-    }
-    const filtered = allUsersCache.filter(user => 
-        user.name.toLowerCase().includes(term) || 
-        user.email.toLowerCase().includes(term)
-    );
-    displayUsersList(filtered);
-    if (filtered.length === 0) {
-        showToast('No Results', 'No users found with that name or email', 'info');
-    }
+    displayUsersList(term ? allUsersCache.filter(u => u.name.toLowerCase().includes(term) || u.email.toLowerCase().includes(term)) : allUsersCache);
 }
 
 function displayUsersList(users) {
-    if (users.length === 0) {
-        allUsersListDiv.innerHTML = '<div class="loading-users">No users found</div>';
-        return;
-    }
+    if (!users.length) { allUsersListDiv.innerHTML = '<div class="loading-users">No users found</div>'; return; }
     allUsersListDiv.innerHTML = '';
-    for (const user of users) {
+    users.forEach(user => {
         const div = document.createElement('div');
         div.className = 'user-item';
-        div.innerHTML = `
-            <div class="user-avatar">
-                <span>${user.name.charAt(0).toUpperCase()}</span>
-                <span class="${user.online ? 'online-dot' : 'offline-dot'}"></span>
-            </div>
-            <div class="user-info">
-                <div class="user-name">${escapeHtml(user.name)}</div>
-                <div class="user-email">${escapeHtml(user.email)}</div>
-                ${user.bio ? `<div class="user-bio">${escapeHtml(user.bio.substring(0, 40))}</div>` : ''}
-            </div>
-            <button class="add-friend-btn" data-uid="${user.uid}" data-name="${user.name}">Add Friend</button>
-        `;
-        const addBtn = div.querySelector('.add-friend-btn');
-        addBtn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            sendFriendRequest(user.uid, user.name);
-        });
+        div.innerHTML = `<div class="user-avatar"><span>${user.name.charAt(0).toUpperCase()}</span><span class="${user.online ? 'online-dot' : 'offline-dot'}"></span></div><div class="user-info"><div class="user-name">${escapeHtml(user.name)}</div><div class="user-email">${escapeHtml(user.email)}</div>${user.bio ? `<div class="user-bio">${escapeHtml(user.bio.substring(0, 40))}</div>` : ''}</div><button class="add-friend-btn" data-uid="${user.uid}" data-name="${user.name}">Add Friend</button>`;
+        div.querySelector('.add-friend-btn').addEventListener('click', (e) => { e.stopPropagation(); sendFriendRequest(user.uid, user.name); });
         allUsersListDiv.appendChild(div);
-    }
-}
-
-if (searchUserInput) {
-    searchUserInput.addEventListener('input', (e) => {
-        if (searchTimeout) clearTimeout(searchTimeout);
-        searchTimeout = setTimeout(() => filterUsers(e.target.value), 300);
     });
 }
 
-async function deleteAccount() {
-    const warning = "⚠️ WARNING: This will permanently delete:\n\n- Your account\n- All your messages\n- Your friend list\n- All friend requests\n\nThis CANNOT be undone!\n\nType 'DELETE' to confirm:";
-    const confirmation = prompt(warning);
-    if (confirmation !== "DELETE") {
-        showToast('Cancelled', 'Account deletion cancelled', 'info');
-        return;
-    }
+searchUserInput?.addEventListener('input', (e) => { clearTimeout(searchTimeout); searchTimeout = setTimeout(() => filterUsers(e.target.value), 300); });
+
+deleteAccountBtn?.addEventListener('click', async () => {
+    if (prompt("Type 'DELETE' to confirm:") !== "DELETE") return showToast('Cancelled', 'Account deletion cancelled', 'info');
     if (!confirm("Are you ABSOLUTELY sure?")) return;
-    
     showToast('Processing', 'Deleting your account...', 'info');
-    
     try {
-        const sentRequests = await getDocs(query(collection(db, 'friend_requests'), where('senderId', '==', currentUser.uid)));
-        for (const docSnap of sentRequests.docs) {
-            await deleteDoc(doc(db, 'friend_requests', docSnap.id));
+        const sent = await getDocs(query(collection(db, 'friend_requests'), where('senderId', '==', currentUser.uid)));
+        for (const d of sent.docs) await deleteDoc(doc(db, 'friend_requests', d.id));
+        const rec = await getDocs(query(collection(db, 'friend_requests'), where('receiverId', '==', currentUser.uid)));
+        for (const d of rec.docs) await deleteDoc(doc(db, 'friend_requests', d.id));
+        const friends = await getDocs(query(collection(db, 'friends'), where('userId', '==', currentUser.uid)));
+        for (const d of friends.docs) {
+            const fid = d.data().friendId;
+            await deleteDoc(doc(db, 'friends', currentUser.uid + '_' + fid));
+            await deleteDoc(doc(db, 'friends', fid + '_' + currentUser.uid));
         }
-        const receivedRequests = await getDocs(query(collection(db, 'friend_requests'), where('receiverId', '==', currentUser.uid)));
-        for (const docSnap of receivedRequests.docs) {
-            await deleteDoc(doc(db, 'friend_requests', docSnap.id));
+        const groups = await getDocs(query(collection(db, 'groups'), where('members', 'array-contains', currentUser.uid)));
+        for (const g of groups.docs) {
+            await updateDoc(doc(db, 'groups', g.id), { members: arrayRemove(currentUser.uid) });
         }
-        const friendships = await getDocs(query(collection(db, 'friends'), where('userId', '==', currentUser.uid)));
-        for (const docSnap of friendships.docs) {
-            const friendId = docSnap.data().friendId;
-            await deleteDoc(doc(db, 'friends', currentUser.uid + '_' + friendId));
-            await deleteDoc(doc(db, 'friends', friendId + '_' + currentUser.uid));
-        }
-        const chatsRef = collection(db, 'chats');
-        const allChats = await getDocs(chatsRef);
-        for (const chatDoc of allChats.docs) {
-            if (chatDoc.id.includes(currentUser.uid)) {
-                const messagesRef = collection(db, 'chats', chatDoc.id, 'messages');
-                const messages = await getDocs(messagesRef);
-                for (const msgDoc of messages.docs) {
-                    await deleteDoc(doc(db, 'chats', chatDoc.id, 'messages', msgDoc.id));
-                }
-                await deleteDoc(doc(db, 'chats', chatDoc.id));
+        const chats = await getDocs(collection(db, 'chats'));
+        for (const chat of chats.docs) {
+            if (chat.id.includes(currentUser.uid)) {
+                const msgs = await getDocs(collection(db, 'chats', chat.id, 'messages'));
+                for (const m of msgs.docs) await deleteDoc(doc(db, 'chats', chat.id, 'messages', m.id));
+                await deleteDoc(doc(db, 'chats', chat.id));
             }
         }
         await deleteDoc(doc(db, 'users', currentUser.uid));
         await deleteUser(currentUser);
-        showToast('Account Deleted', 'Your account has been permanently deleted', 'success');
+        showToast('Deleted', 'Account permanently deleted', 'success');
         setTimeout(() => window.location.reload(), 2000);
-    } catch (error) {
-        console.error("Delete error:", error);
-        showToast('Delete Failed', 'Please re-authenticate and try again', 'error');
-    }
-}
-
-deleteAccountBtn?.addEventListener('click', deleteAccount);
-
-async function markAsDelivered(chatId, messageIds) {
-    for (const messageId of messageIds) {
-        await updateDoc(doc(db, 'chats', chatId, 'messages', messageId), { delivered: true });
-    }
-}
-
-async function markAsSeen(chatId, messageIds) {
-    for (const messageId of messageIds) {
-        await updateDoc(doc(db, 'chats', chatId, 'messages', messageId), { seen: true });
-    }
-}
-
-async function sendTypingStatus() {
-    if (!currentUser || !selectedFriend || !currentChatId) return;
-    const typingRef = doc(db, 'typing', currentChatId);
-    await setDoc(typingRef, { userId: currentUser.uid, isTyping: true, timestamp: new Date().toISOString() });
-    if (typingTimeout) clearTimeout(typingTimeout);
-    typingTimeout = setTimeout(async () => {
-        await setDoc(typingRef, { userId: currentUser.uid, isTyping: false, timestamp: new Date().toISOString() });
-    }, 1500);
-}
-
-function listenTypingStatus() {
-    if (!currentUser || !selectedFriend || !currentChatId) return;
-    const typingRef = doc(db, 'typing', currentChatId);
-    onSnapshot(typingRef, (docSnap) => {
-        if (docSnap.exists() && docSnap.data().userId !== currentUser.uid && docSnap.data().isTyping) {
-            typingIndicator.style.display = 'block';
-            setTimeout(() => { typingIndicator.style.display = 'none'; }, 2000);
-        }
-    });
-}
-
-async function deleteMessage(chatId, messageId) {
-    if (confirm('Delete this message?')) {
-        await updateDoc(doc(db, 'chats', chatId, 'messages', messageId), { text: 'This message was deleted', deleted: true });
-        showToast('Message Deleted', 'Message has been deleted', 'info');
-    }
-}
-
-async function editMessage(chatId, messageId, oldText) {
-    const newText = prompt('Edit message:', oldText);
-    if (newText && newText.trim() && newText.trim() !== oldText) {
-        await updateDoc(doc(db, 'chats', chatId, 'messages', messageId), { text: newText.trim(), edited: true });
-        showToast('Message Edited', 'Message has been updated', 'success');
-    }
-}
+    } catch (error) { showToast('Failed', 'Please re-authenticate', 'error'); }
+});
 
 async function sendFriendRequest(receiverId, receiverName) {
-    if (!currentUser) return;
     const q = query(collection(db, 'friend_requests'), where('senderId', '==', currentUser.uid), where('receiverId', '==', receiverId), where('status', '==', 'pending'));
     const existing = await getDocs(q);
-    if (!existing.empty) {
-        showToast('Request Already Sent', 'Friend request already sent to this user', 'warning');
-        return;
-    }
+    if (!existing.empty) return showToast('Already Sent', 'Request already sent', 'warning');
     await addDoc(collection(db, 'friend_requests'), {
         senderId: currentUser.uid, senderName: currentUser.displayName || currentUser.email.split('@')[0],
-        receiverId: receiverId, receiverName: receiverName, status: 'pending', timestamp: new Date().toISOString()
+        receiverId, receiverName, status: 'pending', timestamp: new Date().toISOString()
     });
     showToast('Request Sent', `Friend request sent to ${receiverName}`, 'success');
 }
 
 async function acceptRequest(requestId, senderId, senderName) {
-    try {
-        const requestRef = doc(db, 'friend_requests', requestId);
-        const requestSnap = await getDoc(requestRef);
-        
-        if (!requestSnap.exists()) {
-            showToast('Error', 'Friend request not found', 'error');
-            return;
-        }
-        
-        if (requestSnap.data().status !== 'pending') {
-            showToast('Info', 'This request has already been processed', 'info');
-            return;
-        }
-        
-        await updateDoc(requestRef, { status: 'accepted' });
-        
-        const chatId = currentUser.uid < senderId ? currentUser.uid + '_' + senderId : senderId + '_' + currentUser.uid;
-        
-        const friendDoc1 = doc(db, 'friends', currentUser.uid + '_' + senderId);
-        const friendDoc2 = doc(db, 'friends', senderId + '_' + currentUser.uid);
-        
-        const [snap1, snap2] = await Promise.all([getDoc(friendDoc1), getDoc(friendDoc2)]);
-        
-        if (!snap1.exists()) {
-            await setDoc(friendDoc1, {
-                userId: currentUser.uid,
-                friendId: senderId,
-                chatId: chatId,
-                createdAt: new Date().toISOString()
-            });
-        }
-        
-        if (!snap2.exists()) {
-            await setDoc(friendDoc2, {
-                userId: senderId,
-                friendId: currentUser.uid,
-                chatId: chatId,
-                createdAt: new Date().toISOString()
-            });
-        }
-        
-        await loadPendingRequestsCount();
-        await loadFriendsList();
-        
-        showToast('Friend Added', `You are now friends with ${senderName} 🎉`, 'success');
-        
-    } catch (error) {
-        console.error('Accept request error:', error);
-        showToast('Error', 'Failed to accept friend request', 'error');
-    }
+    const requestRef = doc(db, 'friend_requests', requestId);
+    const snap = await getDoc(requestRef);
+    if (!snap.exists() || snap.data().status !== 'pending') return showToast('Error', 'Request not available', 'error');
+    await updateDoc(requestRef, { status: 'accepted' });
+    const chatId = currentUser.uid < senderId ? currentUser.uid + '_' + senderId : senderId + '_' + currentUser.uid;
+    const doc1 = doc(db, 'friends', currentUser.uid + '_' + senderId);
+    const doc2 = doc(db, 'friends', senderId + '_' + currentUser.uid);
+    if (!(await getDoc(doc1)).exists()) await setDoc(doc1, { userId: currentUser.uid, friendId: senderId, chatId, createdAt: new Date().toISOString() });
+    if (!(await getDoc(doc2)).exists()) await setDoc(doc2, { userId: senderId, friendId: currentUser.uid, chatId, createdAt: new Date().toISOString() });
+    await loadPendingRequestsCount();
+    await loadFriendsList();
+    showToast('Friend Added', `You are now friends with ${senderName} 🎉`, 'success');
 }
 
 async function rejectRequest(requestId) {
     await updateDoc(doc(db, 'friend_requests', requestId), { status: 'rejected' });
     loadPendingRequestsCount();
     loadPendingRequests();
-    showToast('Request Rejected', 'Friend request rejected', 'info');
+    showToast('Rejected', 'Friend request rejected', 'info');
 }
 
 async function unfriendUser(friendId, friendName) {
     if (confirm(`Remove ${friendName} from friends?`)) {
         await deleteDoc(doc(db, 'friends', currentUser.uid + '_' + friendId));
         await deleteDoc(doc(db, 'friends', friendId + '_' + currentUser.uid));
-        loadFriendsList();
         if (selectedFriend?.uid === friendId) closeChat();
-        showToast('Friend Removed', `${friendName} has been removed from your friends`, 'info');
+        loadFriendsList();
+        showToast('Removed', `${friendName} removed`, 'info');
     }
 }
 
 async function loadPendingRequestsCount() {
     if (!currentUser) return;
-    const q = query(collection(db, 'friend_requests'), where('receiverId', '==', currentUser.uid), where('status', '==', 'pending'));
-    const snapshot = await getDocs(q);
-    const count = snapshot.size;
-    if (count > 0) {
-        requestBadge.classList.remove('hidden');
-        requestBadge.textContent = count;
-    } else {
-        requestBadge.classList.add('hidden');
-    }
+    const snap = await getDocs(query(collection(db, 'friend_requests'), where('receiverId', '==', currentUser.uid), where('status', '==', 'pending')));
+    const count = snap.size;
+    if (count > 0) { requestBadge.classList.remove('hidden'); requestBadge.textContent = count; }
+    else { requestBadge.classList.add('hidden'); }
 }
 
 async function loadPendingRequests() {
     if (!currentUser) return;
-    requestsListDiv.innerHTML = '<div class="loading-users"><i class="fas fa-spinner fa-spin"></i> Loading requests...</div>';
-    const q = query(collection(db, 'friend_requests'), where('receiverId', '==', currentUser.uid), where('status', '==', 'pending'));
-    const snapshot = await getDocs(q);
-    if (snapshot.empty) {
-        requestsListDiv.innerHTML = '<div class="loading-users">No pending requests</div>';
-        return;
-    }
+    requestsListDiv.innerHTML = '<div class="loading-users">Loading...</div>';
+    const snap = await getDocs(query(collection(db, 'friend_requests'), where('receiverId', '==', currentUser.uid), where('status', '==', 'pending')));
+    if (snap.empty) { requestsListDiv.innerHTML = '<div class="loading-users">No pending requests</div>'; return; }
     requestsListDiv.innerHTML = '';
-    snapshot.forEach(docSnap => {
+    snap.forEach(docSnap => {
         const req = docSnap.data();
         const div = document.createElement('div');
         div.className = 'request-item';
-        div.innerHTML = `<span><strong>${escapeHtml(req.senderName)}</strong> sent you a friend request</span><div><button class="accept-btn" data-id="${docSnap.id}" data-sender="${req.senderId}" data-name="${req.senderName}">Accept</button><button class="reject-btn" data-id="${docSnap.id}">Reject</button></div>`;
+        div.innerHTML = `<span><strong>${escapeHtml(req.senderName)}</strong> sent you a request</span><div><button class="accept-btn" data-id="${docSnap.id}" data-sender="${req.senderId}" data-name="${req.senderName}">Accept</button><button class="reject-btn" data-id="${docSnap.id}">Reject</button></div>`;
         requestsListDiv.appendChild(div);
     });
     document.querySelectorAll('.accept-btn').forEach(btn => btn.addEventListener('click', () => acceptRequest(btn.dataset.id, btn.dataset.sender, btn.dataset.name)));
@@ -492,78 +326,50 @@ async function loadPendingRequests() {
 
 async function loadFriendsList() {
     if (!currentUser) return;
-    friendsListDiv.innerHTML = '<div class="loading-users"><i class="fas fa-spinner fa-spin"></i> Loading friends...</div>';
-    
-    const q = query(collection(db, 'friends'), where('userId', '==', currentUser.uid));
-    const snapshot = await getDocs(q);
-    
-    if (snapshot.empty) {
-        friendsListDiv.innerHTML = '<div class="loading-users">No friends yet. Add some!</div>';
-        return;
-    }
-    
-    const uniqueFriends = new Map();
-    
-    for (const docSnap of snapshot.docs) {
-        const friendId = docSnap.data().friendId;
-        if (!uniqueFriends.has(friendId)) {
-            const userDoc = await getDoc(doc(db, 'users', friendId));
-            if (userDoc.exists()) {
-                uniqueFriends.set(friendId, { uid: friendId, ...userDoc.data() });
-            }
+    friendsListDiv.innerHTML = '<div class="loading-users">Loading...</div>';
+    const snap = await getDocs(query(collection(db, 'friends'), where('userId', '==', currentUser.uid)));
+    if (snap.empty) { friendsListDiv.innerHTML = '<div class="loading-users">No friends yet</div>'; return; }
+    const unique = new Map();
+    for (const d of snap.docs) {
+        const fid = d.data().friendId;
+        if (!unique.has(fid)) {
+            const u = await getDoc(doc(db, 'users', fid));
+            if (u.exists()) unique.set(fid, { uid: fid, ...u.data() });
         }
     }
-    
-    const friends = Array.from(uniqueFriends.values());
-    
-    if (friends.length === 0) {
-        friendsListDiv.innerHTML = '<div class="loading-users">No friends found</div>';
-        return;
-    }
-    
+    const friends = Array.from(unique.values());
+    if (!friends.length) { friendsListDiv.innerHTML = '<div class="loading-users">No friends found</div>'; return; }
     friendsListDiv.innerHTML = '';
-    for (const friend of friends) {
-        const isOnline = friend.online || false;
+    friends.forEach(f => {
         const div = document.createElement('div');
         div.className = 'user-item';
-        div.innerHTML = `<div class="user-avatar"><span>${friend.name.charAt(0).toUpperCase()}</span><span class="${isOnline ? 'online-dot' : 'offline-dot'}"></span></div><div class="user-info"><div class="user-name">${escapeHtml(friend.name)}</div><div class="user-email">${escapeHtml(friend.email)}</div>${friend.bio ? `<div class="user-bio">${escapeHtml(friend.bio.substring(0, 40))}</div>` : ''}</div><button class="add-friend-btn unfriend-btn" data-uid="${friend.uid}" data-name="${friend.name}">Unfriend</button>`;
-        const unfriendBtn = div.querySelector('.unfriend-btn');
-        unfriendBtn.addEventListener('click', (e) => { e.stopPropagation(); unfriendUser(friend.uid, friend.name); });
-        div.addEventListener('click', () => openChat(friend));
+        div.innerHTML = `<div class="user-avatar"><span>${f.name.charAt(0).toUpperCase()}</span><span class="${f.online ? 'online-dot' : 'offline-dot'}"></span></div><div class="user-info"><div class="user-name">${escapeHtml(f.name)}</div><div class="user-email">${escapeHtml(f.email)}</div>${f.bio ? `<div class="user-bio">${escapeHtml(f.bio.substring(0, 40))}</div>` : ''}</div><button class="add-friend-btn unfriend-btn" data-uid="${f.uid}" data-name="${f.name}">Unfriend</button>`;
+        div.querySelector('.unfriend-btn').addEventListener('click', (e) => { e.stopPropagation(); unfriendUser(f.uid, f.name); });
+        div.addEventListener('click', () => openChat(f));
         friendsListDiv.appendChild(div);
-    }
+    });
 }
 
 async function loadAllUsers() {
     if (!currentUser) return;
-    allUsersListDiv.innerHTML = '<div class="loading-users"><i class="fas fa-spinner fa-spin"></i> Loading users...</div>';
-    const usersRef = collection(db, 'users');
-    const snapshot = await getDocs(usersRef);
-    const friendsSnapshot = await getDocs(query(collection(db, 'friends'), where('userId', '==', currentUser.uid)));
-    const friendIds = new Set();
-    friendsSnapshot.forEach(docSnap => friendIds.add(docSnap.data().friendId));
+    allUsersListDiv.innerHTML = '<div class="loading-users">Loading...</div>';
     const users = [];
-    for (const docSnap of snapshot.docs) {
-        if (docSnap.id !== currentUser.uid && !friendIds.has(docSnap.id)) {
-            users.push({ uid: docSnap.id, ...docSnap.data() });
-        }
-    }
+    const all = await getDocs(collection(db, 'users'));
+    const friends = await getDocs(query(collection(db, 'friends'), where('userId', '==', currentUser.uid)));
+    const friendIds = new Set(friends.docs.map(d => d.data().friendId));
+    all.forEach(d => { if (d.id !== currentUser.uid && !friendIds.has(d.id)) users.push({ uid: d.id, ...d.data() }); });
     allUsersCache = users;
-    if (users.length === 0) {
-        allUsersListDiv.innerHTML = '<div class="loading-users">No new users to add</div>';
-        return;
-    }
     displayUsersList(users);
 }
 
 async function loadProfile() {
     if (!currentUser) return;
-    const userDoc = await getDoc(doc(db, 'users', currentUser.uid));
-    const userData = userDoc.data();
-    if (avatarPlaceholder) avatarPlaceholder.textContent = (userData.name || currentUser.email).charAt(0).toUpperCase();
-    profileName.value = userData.name || '';
-    profileEmail.value = userData.email || '';
-    profileBio.value = userData.bio || '';
+    const u = await getDoc(doc(db, 'users', currentUser.uid));
+    const d = u.data();
+    avatarPlaceholder.textContent = (d.name || currentUser.email).charAt(0).toUpperCase();
+    profileName.value = d.name || '';
+    profileEmail.value = d.email || '';
+    profileBio.value = d.bio || '';
 }
 
 updateProfileBtn?.addEventListener('click', async () => {
@@ -572,8 +378,8 @@ updateProfileBtn?.addEventListener('click', async () => {
     if (newName) {
         await updateProfile(auth.currentUser, { displayName: newName });
         await updateDoc(doc(db, 'users', currentUser.uid), { name: newName, bio: newBio });
-        showToast('Profile Updated', 'Your profile has been updated successfully', 'success');
-        if (avatarPlaceholder) avatarPlaceholder.textContent = newName.charAt(0).toUpperCase();
+        showToast('Updated', 'Profile updated!', 'success');
+        avatarPlaceholder.textContent = newName.charAt(0).toUpperCase();
         loadFriendsList();
         loadAllUsers();
     }
@@ -589,31 +395,37 @@ function escapeHtml(text) {
 }
 
 async function sendMessage() {
-    if (!currentUser || !selectedFriend) {
-        showToast('No Chat Selected', 'Please select a friend to chat with', 'warning');
-        return;
-    }
+    if (!currentUser) return showToast('Error', 'Please login first', 'warning');
     const text = messageInput?.value.trim();
     if (!text) return;
-    const chatId = currentUser.uid < selectedFriend.uid ? currentUser.uid + '_' + selectedFriend.uid : selectedFriend.uid + '_' + currentUser.uid;
-    const messagesRef = collection(db, 'chats', chatId, 'messages');
-    try {
-        await addDoc(messagesRef, {
-            text: text, senderId: currentUser.uid, receiverId: selectedFriend.uid,
-            timestamp: new Date().toISOString(), sent: true, delivered: false, read: false, seen: false, edited: false, deleted: false
+    
+    if (currentChatType === 'group' && currentGroup) {
+        await addDoc(collection(db, 'group_chats', currentGroup.id, 'messages'), {
+            text: text, senderId: currentUser.uid, senderName: currentUser.displayName || currentUser.email.split('@')[0],
+            timestamp: new Date().toISOString()
         });
         messageInput.value = '';
-        messageInput.focus();
-    } catch (error) {
-        console.error('Error sending message:', error);
-        showToast('Send Failed', 'Failed to send message', 'error');
+    } else if (selectedFriend) {
+        const chatId = currentUser.uid < selectedFriend.uid ? currentUser.uid + '_' + selectedFriend.uid : selectedFriend.uid + '_' + currentUser.uid;
+        await addDoc(collection(db, 'chats', chatId, 'messages'), {
+            text: text, senderId: currentUser.uid, receiverId: selectedFriend.uid,
+            timestamp: new Date().toISOString(), sent: true, delivered: false, read: false, seen: false
+        });
+        messageInput.value = '';
+    } else {
+        showToast('No Chat Selected', 'Select a friend or group to chat with', 'warning');
     }
 }
 
 async function openChat(friend) {
     if (!currentUser) return;
+    currentChatType = 'private';
+    currentGroup = null;
     selectedFriend = friend;
     currentChatId = currentUser.uid < friend.uid ? currentUser.uid + '_' + friend.uid : friend.uid + '_' + currentUser.uid;
+    
+    if (membersUnsubscribe) membersUnsubscribe();
+    
     chatArea.classList.remove('hidden');
     welcomeSection.classList.add('hidden');
     chatsPanel.classList.add('hidden');
@@ -621,76 +433,347 @@ async function openChat(friend) {
     requestsPanel.classList.add('hidden');
     profilePanel.classList.add('hidden');
     notificationPanel.classList.add('hidden');
+    groupsPanel.classList.add('hidden');
+    
     const friendDoc = await getDoc(doc(db, 'users', friend.uid));
     const friendData = friendDoc.data();
-    chatAreaHeader.innerHTML = `<div class="selected-user-info"><div class="user-avatar" style="width:40px;height:40px;font-size:1rem;">${friend.name.charAt(0).toUpperCase()}</div><div><strong>${escapeHtml(friend.name)}</strong><div style="font-size:0.7rem;">${friendData?.online ? '🟢 Online' : '⚫ Offline'}</div>${friendData?.bio ? `<div style="font-size:0.65rem;color:#aaa;">${escapeHtml(friendData.bio.substring(0, 50))}</div>` : ''}</div></div>`;
+    chatAreaHeader.innerHTML = `<div class="selected-user-info"><div class="user-avatar" style="width:45px;height:45px;font-size:1.2rem;">${friend.name.charAt(0).toUpperCase()}</div><div><strong>${escapeHtml(friend.name)}</strong><div style="font-size:0.7rem;">${friendData?.online ? '🟢 Online' : '⚫ Offline'}</div>${friendData?.bio ? `<div style="font-size:0.65rem;color:#aaa;">${escapeHtml(friendData.bio.substring(0, 50))}</div>` : ''}</div></div>`;
+    
     if (messagesUnsubscribe) messagesUnsubscribe();
-    const messagesRef = collection(db, 'chats', currentChatId, 'messages');
-    const q = query(messagesRef, orderBy('timestamp', 'asc'));
-    const deliveredMessages = [];
-    const seenMessages = [];
+    const q = query(collection(db, 'chats', currentChatId, 'messages'), orderBy('timestamp', 'asc'));
     messagesUnsubscribe = onSnapshot(q, (snapshot) => {
-        if (snapshot.empty) {
-            messagesArea.innerHTML = '<div class="no-chat-selected"><i class="fas fa-comments"></i><p>No messages yet. Send a message!</p></div>';
-            return;
-        }
+        if (snapshot.empty) { messagesArea.innerHTML = '<div class="no-chat-selected">No messages yet</div>'; return; }
         messagesArea.innerHTML = '';
         snapshot.forEach(docSnap => {
             const msg = docSnap.data();
             const isOwn = msg.senderId === currentUser.uid;
-            const isDeleted = msg.deleted === true;
-            if (!isOwn && !msg.delivered) deliveredMessages.push(docSnap.id);
-            if (!isOwn && msg.delivered && !msg.seen) seenMessages.push(docSnap.id);
-            const messageDiv = document.createElement('div');
-            messageDiv.className = `message ${isOwn ? 'own' : 'other'}`;
-            let timeStr = '';
-            if (msg.timestamp) {
-                const date = new Date(msg.timestamp);
-                timeStr = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-            }
-            let contentHtml = '';
-            if (isDeleted) {
-                contentHtml = `<div class="message-text" style="font-style:italic;opacity:0.6;">${escapeHtml(msg.text)}</div>`;
-            } else {
-                contentHtml = `<div class="message-text">${escapeHtml(msg.text)}</div>`;
-            }
-            
-            let readStatusHtml = '';
+            const div = document.createElement('div');
+            div.className = `message ${isOwn ? 'own' : 'other'}`;
+            let time = msg.timestamp ? new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
+            let status = '';
             if (isOwn) {
-                if (msg.seen) {
-                    readStatusHtml = `<span class="read-status" style="color: #000; font-size: 1.1rem; font-weight: bold;">●</span>`;
-                } else if (msg.delivered) {
-                    readStatusHtml = `<span class="read-status" style="color: #00ffff;">✓✓</span>`;
-                } else if (msg.sent) {
-                    readStatusHtml = `<span class="read-status" style="color: #aaa;">✓</span>`;
-                }
+                if (msg.seen) status = '<span style="color:#000;">●</span>';
+                else if (msg.delivered) status = '<span style="color:#00ffff;">✓✓</span>';
+                else if (msg.sent) status = '<span style="color:#aaa;">✓</span>';
             }
-            
-            messageDiv.innerHTML = `<div class="message-bubble">${contentHtml}<div class="message-time">${timeStr} ${readStatusHtml}${isOwn && !isDeleted ? `<div class="message-menu"><button class="message-menu-btn edit-msg" data-id="${docSnap.id}" data-text="${escapeHtml(msg.text)}"><i class="fas fa-edit"></i></button><button class="message-menu-btn delete-msg" data-id="${docSnap.id}"><i class="fas fa-trash"></i></button></div>` : ''}${msg.edited && !isDeleted ? '<span style="font-size:0.6rem;">(edited)</span>' : ''}</div></div>`;
-            messagesArea.appendChild(messageDiv);
+            div.innerHTML = `<div class="message-bubble"><div class="message-text">${escapeHtml(msg.text)}</div><div class="message-time">${time} ${status}</div></div>`;
+            messagesArea.appendChild(div);
+        });
+        messagesArea.scrollTop = messagesArea.scrollHeight;
+    });
+}
+
+async function openGroupChat(group) {
+    if (!currentUser) return;
+    currentChatType = 'group';
+    selectedFriend = null;
+    currentGroup = group;
+    currentChatId = `group_${group.id}`;
+    
+    chatArea.classList.remove('hidden');
+    welcomeSection.classList.add('hidden');
+    chatsPanel.classList.add('hidden');
+    findFriendsPanel.classList.add('hidden');
+    requestsPanel.classList.add('hidden');
+    profilePanel.classList.add('hidden');
+    notificationPanel.classList.add('hidden');
+    groupsPanel.classList.add('hidden');
+    
+    const isAdmin = group.admins?.includes(currentUser.uid);
+    chatAreaHeader.innerHTML = `
+        <div style="display:flex;justify-content:space-between;align-items:center;width:100%;flex-wrap:wrap;gap:10px;">
+            <div class="selected-user-info">
+                <div class="group-avatar" style="width:45px;height:45px;border-radius:12px;background:linear-gradient(135deg,#00ffff,#8a2be2);display:flex;align-items:center;justify-content:center;font-weight:bold;font-size:1.2rem;">${group.name.charAt(0).toUpperCase()}</div>
+                <div>
+                    <strong>${escapeHtml(group.name)}</strong>
+                    <div style="font-size:0.7rem;">${group.members?.length || 0} members • ${isAdmin ? '👑 Admin' : 'Member'}</div>
+                    ${group.description ? `<div style="font-size:0.65rem;color:#aaa;">${escapeHtml(group.description)}</div>` : ''}
+                </div>
+            </div>
+            <div class="group-actions">
+                <button id="groupSettingsBtn" class="group-action-btn" title="Group Settings" style="background:none;border:none;color:#00ffff;cursor:pointer;padding:5px;"><i class="fas fa-cog"></i> Settings</button>
+            </div>
+        </div>
+    `;
+    
+    document.getElementById('groupSettingsBtn')?.addEventListener('click', () => openGroupSettings(group));
+    
+    if (messagesUnsubscribe) messagesUnsubscribe();
+    if (membersUnsubscribe) membersUnsubscribe();
+    
+    const messagesRef = collection(db, 'group_chats', group.id, 'messages');
+    const q = query(messagesRef, orderBy('timestamp', 'asc'));
+    messagesUnsubscribe = onSnapshot(q, (snapshot) => {
+        if (snapshot.empty) { messagesArea.innerHTML = '<div class="no-chat-selected">No messages yet</div>'; return; }
+        messagesArea.innerHTML = '';
+        snapshot.forEach(docSnap => {
+            const msg = docSnap.data();
+            const isOwn = msg.senderId === currentUser.uid;
+            const div = document.createElement('div');
+            div.className = `message ${isOwn ? 'own' : 'other'}`;
+            let time = msg.timestamp ? new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
+            div.innerHTML = `<div class="message-bubble"><div class="message-text"><strong>${escapeHtml(msg.senderName || 'Unknown')}:</strong> ${escapeHtml(msg.text)}</div><div class="message-time">${time}</div></div>`;
+            messagesArea.appendChild(div);
             if (!isOwn && !document.hasFocus()) {
-                showNotification(`New message from ${friend.name}`, msg.text.substring(0, 100));
+                showNotification(`New message in ${group.name}`, `${msg.senderName}: ${msg.text.substring(0, 100)}`);
             }
         });
         messagesArea.scrollTop = messagesArea.scrollHeight;
-        if (deliveredMessages.length > 0) markAsDelivered(currentChatId, deliveredMessages);
-        if (seenMessages.length > 0) markAsSeen(currentChatId, seenMessages);
-        document.querySelectorAll('.edit-msg').forEach(btn => btn.addEventListener('click', (e) => { e.stopPropagation(); editMessage(currentChatId, btn.dataset.id, btn.dataset.text); }));
-        document.querySelectorAll('.delete-msg').forEach(btn => btn.addEventListener('click', (e) => { e.stopPropagation(); deleteMessage(currentChatId, btn.dataset.id); }));
     });
-    listenTypingStatus();
+    
+    // Load members - display inline below header, not as separate sidebar
+    const loadMembersInline = async () => {
+        const members = group.members || [];
+        let membersHtml = '<div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:10px;padding:8px;background:rgba(0,0,0,0.2);border-radius:10px;">';
+        for (const memberId of members) {
+            const userDoc = await getDoc(doc(db, 'users', memberId));
+            if (userDoc.exists()) {
+                const member = userDoc.data();
+                const isOnline = member.online || false;
+                const isAdminUser = group.admins?.includes(memberId);
+                const isCreator = group.createdBy === memberId;
+                membersHtml += `
+                    <div style="display:inline-flex;align-items:center;gap:5px;background:rgba(0,255,255,0.1);padding:4px 10px;border-radius:20px;">
+                        <span style="width:8px;height:8px;border-radius:50%;background:${isOnline ? '#00ff88' : '#666'};"></span>
+                        <span style="font-size:0.75rem;color:white;">${escapeHtml(member.name)}</span>
+                        ${isCreator ? '<span style="font-size:0.6rem;color:#ffaa00;">👑</span>' : (isAdminUser ? '<span style="font-size:0.6rem;color:#00ffff;">👑</span>' : '')}
+                        ${memberId === currentUser.uid ? '<span style="font-size:0.6rem;color:#00ffff;">(You)</span>' : ''}
+                    </div>
+                `;
+            }
+        }
+        membersHtml += '</div>';
+        if (!document.getElementById('groupMembersInline')) {
+            const membersContainer = document.createElement('div');
+            membersContainer.id = 'groupMembersInline';
+            chatAreaHeader.appendChild(membersContainer);
+        }
+        const membersContainer = document.getElementById('groupMembersInline');
+        if (membersContainer) membersContainer.innerHTML = membersHtml;
+    };
+    
+    await loadMembersInline();
+    const interval = setInterval(loadMembersInline, 5000);
+    membersUnsubscribe = () => clearInterval(interval);
 }
 
 function closeChat() {
     if (messagesUnsubscribe) messagesUnsubscribe();
+    if (membersUnsubscribe) membersUnsubscribe();
+    const membersContainer = document.getElementById('groupMembersInline');
+    if (membersContainer) membersContainer.remove();
     selectedFriend = null;
+    currentGroup = null;
     currentChatId = null;
+    currentChatType = null;
     chatArea.classList.add('hidden');
     welcomeSection.classList.remove('hidden');
 }
 
+async function loadGroupsList() {
+    if (!currentUser) return;
+    groupsListDiv.innerHTML = '<div class="loading-users">Loading groups...</div>';
+    const q = query(collection(db, 'groups'), where('members', 'array-contains', currentUser.uid));
+    const snapshot = await getDocs(q);
+    if (snapshot.empty) { groupsListDiv.innerHTML = '<div class="loading-users">No groups yet. Create one!</div>'; return; }
+    groupsListDiv.innerHTML = '';
+    for (const docSnap of snapshot.docs) {
+        const group = { id: docSnap.id, ...docSnap.data() };
+        const div = document.createElement('div');
+        div.className = 'group-item';
+        div.style.cursor = 'pointer';
+        const isAdmin = group.admins?.includes(currentUser.uid);
+        div.innerHTML = `
+            <div class="group-avatar">${group.name.charAt(0).toUpperCase()}</div>
+            <div class="group-info">
+                <div class="group-name">${escapeHtml(group.name)} ${isAdmin ? '<span style="font-size:0.7rem;color:#00ffff;">👑 Admin</span>' : ''}</div>
+                <div class="group-description">${escapeHtml(group.description || 'No description')}</div>
+                <div class="group-member-count"><i class="fas fa-users"></i> ${group.members?.length || 0} members</div>
+            </div>
+            <i class="fas fa-chevron-right" style="color:#00ffff;"></i>
+        `;
+        div.addEventListener('click', () => openGroupChat(group));
+        groupsListDiv.appendChild(div);
+    }
+}
+
+createGroupBtn?.addEventListener('click', async () => {
+    selectedMembersForGroup.clear();
+    await loadFriendsForGroupSelection();
+    createGroupModal.classList.remove('hidden');
+});
+
+closeCreateModal?.addEventListener('click', () => {
+    createGroupModal.classList.add('hidden');
+    groupNameInput.value = '';
+    groupDescriptionInput.value = '';
+});
+
+async function loadFriendsForGroupSelection() {
+    const q = query(collection(db, 'friends'), where('userId', '==', currentUser.uid));
+    const snapshot = await getDocs(q);
+    const friends = [];
+    for (const docSnap of snapshot.docs) {
+        const friendId = docSnap.data().friendId;
+        const userDoc = await getDoc(doc(db, 'users', friendId));
+        if (userDoc.exists()) friends.push({ uid: friendId, ...userDoc.data() });
+    }
+    groupMembersList.innerHTML = '';
+    if (friends.length === 0) { groupMembersList.innerHTML = '<div class="loading-users">No friends to add. Add some friends first!</div>'; return; }
+    friends.forEach(friend => {
+        const div = document.createElement('div');
+        div.className = 'group-member-item';
+        div.innerHTML = `<div><input type="checkbox" class="add-member-checkbox" data-uid="${friend.uid}" data-name="${friend.name}"> <strong>${escapeHtml(friend.name)}</strong> (${escapeHtml(friend.email)})</div>`;
+        const checkbox = div.querySelector('.add-member-checkbox');
+        checkbox.addEventListener('change', (e) => {
+            if (e.target.checked) selectedMembersForGroup.add(friend.uid);
+            else selectedMembersForGroup.delete(friend.uid);
+        });
+        groupMembersList.appendChild(div);
+    });
+}
+
+confirmCreateGroupBtn?.addEventListener('click', async () => {
+    const groupName = groupNameInput.value.trim();
+    if (!groupName) { showToast('Error', 'Group name required', 'error'); return; }
+    const members = [currentUser.uid, ...Array.from(selectedMembersForGroup)];
+    const groupData = {
+        name: groupName,
+        description: groupDescriptionInput.value.trim() || '',
+        createdBy: currentUser.uid,
+        createdAt: new Date().toISOString(),
+        members: members,
+        admins: [currentUser.uid]
+    };
+    const groupRef = await addDoc(collection(db, 'groups'), groupData);
+    for (const memberId of members) {
+        await addDoc(collection(db, 'group_members'), { groupId: groupRef.id, userId: memberId, joinedAt: new Date().toISOString() });
+    }
+    showToast('Success', `Group "${groupName}" created!`, 'success');
+    createGroupModal.classList.add('hidden');
+    groupNameInput.value = '';
+    groupDescriptionInput.value = '';
+    loadGroupsList();
+});
+
+async function openGroupSettings(group) {
+    currentGroupForSettings = group;
+    editGroupName.value = group.name || '';
+    editGroupDescription.value = group.description || '';
+    editGroupAvatar.value = group.avatar || '';
+    
+    const members = group.members || [];
+    groupMembersManageList.innerHTML = '<div class="loading-users">Loading members...</div>';
+    const memberData = [];
+    for (const memberId of members) {
+        const userDoc = await getDoc(doc(db, 'users', memberId));
+        if (userDoc.exists()) memberData.push({ uid: memberId, ...userDoc.data() });
+    }
+    groupMembersManageList.innerHTML = '';
+    memberData.forEach(member => {
+        const div = document.createElement('div');
+        div.className = 'group-member-item';
+        const isAdmin = group.admins?.includes(member.uid);
+        const isOwner = group.createdBy === member.uid;
+        div.innerHTML = `
+            <div style="display:flex;justify-content:space-between;align-items:center;width:100%;">
+                <div><strong>${escapeHtml(member.name)}</strong> (${escapeHtml(member.email)}) ${isOwner ? '👑 Owner' : (isAdmin ? '👑 Admin' : '')}</div>
+                ${!isOwner && member.uid !== currentUser.uid ? `<button class="remove-member-btn" data-uid="${member.uid}" data-name="${member.name}" style="background:#ff4444;border:none;padding:4px 12px;border-radius:6px;color:white;cursor:pointer;">Remove</button>` : ''}
+            </div>
+        `;
+        const removeBtn = div.querySelector('.remove-member-btn');
+        removeBtn?.addEventListener('click', async () => {
+            if (confirm(`Remove ${member.name} from group?`)) {
+                await updateDoc(doc(db, 'groups', group.id), { members: arrayRemove(member.uid) });
+                showToast('Removed', `${member.name} removed`, 'info');
+                openGroupSettings(group);
+                loadGroupsList();
+                if (currentGroup?.id === group.id) openGroupChat(group);
+            }
+        });
+        groupMembersManageList.appendChild(div);
+    });
+    
+    await loadFriendsToAdd(group);
+    groupSettingsModal.classList.remove('hidden');
+}
+
+async function loadFriendsToAdd(group) {
+    const q = query(collection(db, 'friends'), where('userId', '==', currentUser.uid));
+    const snapshot = await getDocs(q);
+    const groupMembers = new Set(group.members || []);
+    const availableFriends = [];
+    for (const docSnap of snapshot.docs) {
+        const friendId = docSnap.data().friendId;
+        if (!groupMembers.has(friendId)) {
+            const userDoc = await getDoc(doc(db, 'users', friendId));
+            if (userDoc.exists()) availableFriends.push({ uid: friendId, ...userDoc.data() });
+        }
+    }
+    allFriendsList = availableFriends;
+    displayFriendsToAdd(availableFriends);
+    
+    searchFriendToAdd?.addEventListener('input', (e) => {
+        const term = e.target.value.toLowerCase();
+        const filtered = availableFriends.filter(f => f.name.toLowerCase().includes(term) || f.email.toLowerCase().includes(term));
+        displayFriendsToAdd(filtered);
+    });
+}
+
+function displayFriendsToAdd(friends) {
+    friendsToAddList.innerHTML = '';
+    if (friends.length === 0) { friendsToAddList.innerHTML = '<div class="loading-users">No friends available to add</div>'; return; }
+    friends.forEach(friend => {
+        const div = document.createElement('div');
+        div.className = 'group-member-item';
+        div.innerHTML = `<div><input type="checkbox" class="add-friend-checkbox" data-uid="${friend.uid}"> <strong>${escapeHtml(friend.name)}</strong> (${escapeHtml(friend.email)})</div>`;
+        friendsToAddList.appendChild(div);
+    });
+}
+
+saveGroupSettingsBtn?.addEventListener('click', async () => {
+    if (!currentGroupForSettings) return;
+    const newName = editGroupName.value.trim();
+    if (!newName) { showToast('Error', 'Group name required', 'error'); return; }
+    await updateDoc(doc(db, 'groups', currentGroupForSettings.id), {
+        name: newName,
+        description: editGroupDescription.value.trim() || '',
+        avatar: editGroupAvatar.value.trim() || ''
+    });
+    const selectedCheckboxes = friendsToAddList.querySelectorAll('.add-friend-checkbox:checked');
+    const newMembers = [];
+    selectedCheckboxes.forEach(cb => newMembers.push(cb.dataset.uid));
+    if (newMembers.length > 0) {
+        await updateDoc(doc(db, 'groups', currentGroupForSettings.id), { members: arrayUnion(...newMembers) });
+        for (const memberId of newMembers) {
+            await addDoc(collection(db, 'group_members'), { groupId: currentGroupForSettings.id, userId: memberId, joinedAt: new Date().toISOString() });
+        }
+    }
+    showToast('Updated', 'Group settings updated!', 'success');
+    groupSettingsModal.classList.add('hidden');
+    loadGroupsList();
+    if (currentGroup?.id === currentGroupForSettings.id) openGroupChat(currentGroupForSettings);
+});
+
+deleteGroupBtn?.addEventListener('click', async () => {
+    if (!currentGroupForSettings) return;
+    if (confirm(`Delete "${currentGroupForSettings.name}"? This cannot be undone.`)) {
+        const members = await getDocs(query(collection(db, 'group_members'), where('groupId', '==', currentGroupForSettings.id)));
+        for (const m of members.docs) await deleteDoc(doc(db, 'group_members', m.id));
+        const messages = await getDocs(collection(db, 'group_chats', currentGroupForSettings.id, 'messages'));
+        for (const msg of messages.docs) await deleteDoc(doc(db, 'group_chats', currentGroupForSettings.id, 'messages', msg.id));
+        await deleteDoc(doc(db, 'groups', currentGroupForSettings.id));
+        showToast('Deleted', 'Group deleted', 'success');
+        groupSettingsModal.classList.add('hidden');
+        loadGroupsList();
+        if (currentGroup?.id === currentGroupForSettings.id) closeChat();
+    }
+});
+
+closeGroupSettingsModal?.addEventListener('click', () => groupSettingsModal.classList.add('hidden'));
+
 sendBtn?.addEventListener('click', sendMessage);
-messageInput?.addEventListener('keypress', (e) => { if (e.key === 'Enter') sendMessage(); else sendTypingStatus(); });
+messageInput?.addEventListener('keypress', (e) => { if (e.key === 'Enter') sendMessage(); });
 
 emojiBtn?.addEventListener('click', (e) => { e.stopPropagation(); emojiPicker.classList.toggle('hidden'); });
 document.querySelectorAll('.emoji').forEach(emoji => {
@@ -699,28 +782,74 @@ document.querySelectorAll('.emoji').forEach(emoji => {
 document.addEventListener('click', (e) => { if (!emojiPicker?.contains(e.target) && !emojiBtn?.contains(e.target)) emojiPicker?.classList.add('hidden'); });
 
 chatsTab?.addEventListener('click', () => {
-    welcomeSection.classList.add('hidden'); chatArea.classList.add('hidden'); chatsPanel.classList.remove('hidden');
-    findFriendsPanel.classList.add('hidden'); requestsPanel.classList.add('hidden'); profilePanel.classList.add('hidden'); notificationPanel.classList.add('hidden');
+    closeChat();
+    chatsPanel.classList.remove('hidden');
+    findFriendsPanel.classList.add('hidden');
+    requestsPanel.classList.add('hidden');
+    profilePanel.classList.add('hidden');
+    notificationPanel.classList.add('hidden');
+    groupsPanel.classList.add('hidden');
+    welcomeSection.classList.add('hidden');
     loadFriendsList();
 });
+
 findFriendsTab?.addEventListener('click', () => {
-    welcomeSection.classList.add('hidden'); chatArea.classList.add('hidden'); chatsPanel.classList.add('hidden');
-    findFriendsPanel.classList.remove('hidden'); requestsPanel.classList.add('hidden'); profilePanel.classList.add('hidden'); notificationPanel.classList.add('hidden');
+    closeChat();
+    chatsPanel.classList.add('hidden');
+    findFriendsPanel.classList.remove('hidden');
+    requestsPanel.classList.add('hidden');
+    profilePanel.classList.add('hidden');
+    notificationPanel.classList.add('hidden');
+    groupsPanel.classList.add('hidden');
+    welcomeSection.classList.add('hidden');
     loadAllUsers();
 });
+
 requestsTab?.addEventListener('click', () => {
-    welcomeSection.classList.add('hidden'); chatArea.classList.add('hidden'); chatsPanel.classList.add('hidden');
-    findFriendsPanel.classList.add('hidden'); requestsPanel.classList.remove('hidden'); profilePanel.classList.add('hidden'); notificationPanel.classList.add('hidden');
+    closeChat();
+    chatsPanel.classList.add('hidden');
+    findFriendsPanel.classList.add('hidden');
+    requestsPanel.classList.remove('hidden');
+    profilePanel.classList.add('hidden');
+    notificationPanel.classList.add('hidden');
+    groupsPanel.classList.add('hidden');
+    welcomeSection.classList.add('hidden');
     loadPendingRequests();
 });
+
+groupsTab?.addEventListener('click', () => {
+    closeChat();
+    chatsPanel.classList.add('hidden');
+    findFriendsPanel.classList.add('hidden');
+    requestsPanel.classList.add('hidden');
+    profilePanel.classList.add('hidden');
+    notificationPanel.classList.add('hidden');
+    groupsPanel.classList.remove('hidden');
+    welcomeSection.classList.add('hidden');
+    loadGroupsList();
+});
+
 profileSettingsBtn?.addEventListener('click', () => {
-    welcomeSection.classList.add('hidden'); chatArea.classList.add('hidden'); chatsPanel.classList.add('hidden');
-    findFriendsPanel.classList.add('hidden'); requestsPanel.classList.add('hidden'); profilePanel.classList.remove('hidden'); notificationPanel.classList.add('hidden');
+    closeChat();
+    chatsPanel.classList.add('hidden');
+    findFriendsPanel.classList.add('hidden');
+    requestsPanel.classList.add('hidden');
+    profilePanel.classList.remove('hidden');
+    notificationPanel.classList.add('hidden');
+    groupsPanel.classList.add('hidden');
+    welcomeSection.classList.add('hidden');
     loadProfile();
 });
+
 notificationSettingsBtn?.addEventListener('click', () => {
-    welcomeSection.classList.add('hidden'); chatArea.classList.add('hidden'); chatsPanel.classList.add('hidden');
-    findFriendsPanel.classList.add('hidden'); requestsPanel.classList.add('hidden'); profilePanel.classList.add('hidden'); notificationPanel.classList.remove('hidden');
+    closeChat();
+    chatsPanel.classList.add('hidden');
+    findFriendsPanel.classList.add('hidden');
+    requestsPanel.classList.add('hidden');
+    profilePanel.classList.add('hidden');
+    notificationPanel.classList.remove('hidden');
+    groupsPanel.classList.add('hidden');
+    welcomeSection.classList.add('hidden');
 });
 
 onAuthStateChanged(auth, async (user) => {
@@ -737,12 +866,16 @@ onAuthStateChanged(auth, async (user) => {
         }
         loadPendingRequestsCount();
         loadFriendsList();
+        loadGroupsList();
         if (chatsTab) chatsTab.click();
         showToast('Welcome Back!', `Hello ${user.displayName || user.email.split('@')[0]}`, 'success');
     } else {
         if (currentUser) await updateDoc(doc(db, 'users', currentUser.uid), { online: false });
-        currentUser = null; selectedFriend = null;
+        currentUser = null; selectedFriend = null; currentGroup = null;
         if (messagesUnsubscribe) messagesUnsubscribe();
+        if (membersUnsubscribe) membersUnsubscribe();
+        const membersContainer = document.getElementById('groupMembersInline');
+        if (membersContainer) membersContainer.remove();
         authContainer.classList.remove('hidden');
         chatContainer.classList.add('hidden');
     }
@@ -776,32 +909,9 @@ if (themeToggleNav) {
     });
 }
 
-async function cleanDuplicateFriends() {
-    const q = query(collection(db, 'friends'), where('userId', '==', currentUser.uid));
-    const snapshot = await getDocs(q);
-
-    const unique = new Map();
-
-    for (const docSnap of snapshot.docs) {
-        const friendId = docSnap.data().friendId;
-        if (unique.has(friendId)) {
-            await deleteDoc(doc(db, 'friends', docSnap.id));
-            console.log(`Deleted duplicate: ${friendId}`);
-        } else {
-            unique.set(friendId, docSnap.id);
-        }
-    }
-
-    await loadFriendsList();
-    showToast('Cleaned', 'Duplicate friends removed', 'success');
-}
-
-window.cleanDuplicateFriends = cleanDuplicateFriends;
-
 console.log("========================================");
-console.log("HemalChatApp - The Secure and Personal Chat App");
-console.log("✅ Toast notifications | ✅ Read Status: ✓ → ✓✓ → ●");
-console.log("✅ Search Users | ✅ Delete Account | ✅ Notifications");
-console.log("✅ Typing Indicator | ✅ Online Status | ✅ Edit/Delete Message");
+console.log("HemalChatApp - Complete Group Chat System");
+console.log("✅ Group Chat | ✅ Member List | ✅ Online/Offline Status");
+console.log("✅ Group Settings | ✅ Private Chat | ✅ Friend System");
 console.log("Created by Hemal Das");
 console.log("========================================");
